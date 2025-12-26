@@ -3,12 +3,15 @@ import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { BookOpen, ArrowLeft, Eye, EyeOff, Camera, Upload } from "lucide-react";
+import { BookOpen, ArrowLeft, Eye, EyeOff, Camera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 const Signup = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signUp } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState({
@@ -18,7 +21,7 @@ const Signup = () => {
     parentWhatsapp: "",
     class: "",
     age: "",
-    board: "CBSE",
+    board: "CBSE" as "CBSE" | "ICSE" | "Bihar Board" | "Other",
     schoolName: "Insight Public School, Kishanganj",
     district: "",
     state: "",
@@ -38,6 +41,15 @@ const Signup = () => {
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "Photo too large",
+          description: "Please upload a photo smaller than 5MB",
+          variant: "destructive"
+        });
+        return;
+      }
+      
       const reader = new FileReader();
       reader.onloadend = () => {
         setPhotoPreview(reader.result as string);
@@ -59,20 +71,87 @@ const Signup = () => {
       return;
     }
 
+    if (formData.password.length < 6) {
+      toast({
+        title: "Password too short",
+        description: "Password must be at least 6 characters.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
-    // Simulate signup - will be replaced with actual auth
-    setTimeout(() => {
-      localStorage.setItem("userType", "student");
-      localStorage.setItem("userEmail", formData.email);
-      localStorage.setItem("userName", formData.fullName);
+    try {
+      // Sign up with Supabase Auth
+      const { error: authError } = await signUp(formData.email, formData.password, {
+        full_name: formData.fullName,
+      });
+
+      if (authError) {
+        if (authError.message.includes("already registered")) {
+          toast({
+            title: "Account exists",
+            description: "This email is already registered. Please login instead.",
+            variant: "destructive",
+          });
+        } else {
+          throw authError;
+        }
+        setIsLoading(false);
+        return;
+      }
+
+      // Get the school ID
+      const { data: schoolData } = await supabase
+        .from("schools")
+        .select("id")
+        .eq("school_id", "ips855108")
+        .maybeSingle();
+
+      // Wait for auth to complete and get user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user && schoolData) {
+        // Create student profile
+        const { error: profileError } = await supabase
+          .from("students")
+          .insert({
+            user_id: user.id,
+            photo_url: formData.photo,
+            full_name: formData.fullName,
+            phone: formData.phone,
+            parent_whatsapp: formData.parentWhatsapp,
+            class: formData.class,
+            age: parseInt(formData.age),
+            board: formData.board,
+            school_id: schoolData.id,
+            district: formData.district,
+            state: formData.state,
+          });
+
+        if (profileError) {
+          console.error("Profile creation error:", profileError);
+          // Don't throw - user can still use the app
+        }
+      }
+
       toast({
         title: "Account Created!",
         description: "Welcome to EduImprove AI. Let's start studying!",
       });
+      
       navigate("/dashboard");
+    } catch (error) {
+      console.error("Signup error:", error);
+      toast({
+        title: "Signup Failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (

@@ -14,7 +14,192 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      chat_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          image_url: string | null
+          role: string
+          session_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          role: string
+          session_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          role?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "study_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      schools: {
+        Row: {
+          created_at: string
+          district: string | null
+          id: string
+          name: string
+          password_hash: string
+          school_id: string
+          state: string | null
+        }
+        Insert: {
+          created_at?: string
+          district?: string | null
+          id?: string
+          name: string
+          password_hash: string
+          school_id: string
+          state?: string | null
+        }
+        Update: {
+          created_at?: string
+          district?: string | null
+          id?: string
+          name?: string
+          password_hash?: string
+          school_id?: string
+          state?: string | null
+        }
+        Relationships: []
+      }
+      students: {
+        Row: {
+          age: number
+          board: Database["public"]["Enums"]["board_type"]
+          class: string
+          created_at: string
+          district: string
+          full_name: string
+          id: string
+          parent_whatsapp: string
+          phone: string
+          photo_url: string | null
+          school_id: string | null
+          state: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          age: number
+          board?: Database["public"]["Enums"]["board_type"]
+          class: string
+          created_at?: string
+          district: string
+          full_name: string
+          id?: string
+          parent_whatsapp: string
+          phone: string
+          photo_url?: string | null
+          school_id?: string | null
+          state: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          age?: number
+          board?: Database["public"]["Enums"]["board_type"]
+          class?: string
+          created_at?: string
+          district?: string
+          full_name?: string
+          id?: string
+          parent_whatsapp?: string
+          phone?: string
+          photo_url?: string | null
+          school_id?: string | null
+          state?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "students_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      study_sessions: {
+        Row: {
+          ai_summary: string | null
+          created_at: string
+          end_time: string | null
+          id: string
+          improvement_score: number | null
+          start_time: string
+          strong_areas: string[] | null
+          student_id: string
+          subject: string | null
+          time_spent: number | null
+          topic: string
+          understanding_level:
+            | Database["public"]["Enums"]["understanding_level"]
+            | null
+          weak_areas: string[] | null
+        }
+        Insert: {
+          ai_summary?: string | null
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          improvement_score?: number | null
+          start_time?: string
+          strong_areas?: string[] | null
+          student_id: string
+          subject?: string | null
+          time_spent?: number | null
+          topic?: string
+          understanding_level?:
+            | Database["public"]["Enums"]["understanding_level"]
+            | null
+          weak_areas?: string[] | null
+        }
+        Update: {
+          ai_summary?: string | null
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          improvement_score?: number | null
+          start_time?: string
+          strong_areas?: string[] | null
+          student_id?: string
+          subject?: string | null
+          time_spent?: number | null
+          topic?: string
+          understanding_level?:
+            | Database["public"]["Enums"]["understanding_level"]
+            | null
+          weak_areas?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_sessions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +208,9 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      board_type: "CBSE" | "ICSE" | "Bihar Board" | "Other"
+      improvement_trend: "up" | "down" | "stable"
+      understanding_level: "weak" | "average" | "good" | "excellent"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +337,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      board_type: ["CBSE", "ICSE", "Bihar Board", "Other"],
+      improvement_trend: ["up", "down", "stable"],
+      understanding_level: ["weak", "average", "good", "excellent"],
+    },
   },
 } as const

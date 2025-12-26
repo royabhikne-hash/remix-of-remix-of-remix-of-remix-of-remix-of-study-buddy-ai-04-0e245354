@@ -1,1 +1,4 @@
 project_id = "elkimdndmvrtolmbwbct"
+
+[functions.study-chat]
+verify_jwt = false

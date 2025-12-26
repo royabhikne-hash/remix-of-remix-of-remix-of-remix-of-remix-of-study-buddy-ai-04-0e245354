@@ -9,12 +9,12 @@ import {
   Minus,
   LogOut,
   Search,
-  Filter,
   BookOpen,
   CheckCircle,
   XCircle,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { supabase } from "@/integrations/supabase/client";
 
 interface StudentData {
   id: string;
@@ -32,75 +32,92 @@ const SchoolDashboard = () => {
   const [schoolName, setSchoolName] = useState("School");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedClass, setSelectedClass] = useState("all");
-
-  // Mock student data
-  const [students] = useState<StudentData[]>([
-    {
-      id: "1",
-      photo: "",
-      name: "Rahul Kumar",
-      class: "Class 10",
-      todayStudied: true,
-      topicStudied: "Physics - Motion",
-      improvementTrend: "up",
-      totalSessions: 24,
-    },
-    {
-      id: "2",
-      photo: "",
-      name: "Priya Singh",
-      class: "Class 10",
-      todayStudied: true,
-      topicStudied: "Chemistry - Atoms",
-      improvementTrend: "up",
-      totalSessions: 32,
-    },
-    {
-      id: "3",
-      photo: "",
-      name: "Amit Sharma",
-      class: "Class 9",
-      todayStudied: false,
-      topicStudied: "-",
-      improvementTrend: "stable",
-      totalSessions: 18,
-    },
-    {
-      id: "4",
-      photo: "",
-      name: "Sneha Patel",
-      class: "Class 10",
-      todayStudied: true,
-      topicStudied: "Maths - Algebra",
-      improvementTrend: "down",
-      totalSessions: 15,
-    },
-    {
-      id: "5",
-      photo: "",
-      name: "Vikram Yadav",
-      class: "Class 9",
-      todayStudied: false,
-      topicStudied: "-",
-      improvementTrend: "stable",
-      totalSessions: 20,
-    },
-    {
-      id: "6",
-      photo: "",
-      name: "Anita Kumari",
-      class: "Class 11",
-      todayStudied: true,
-      topicStudied: "Biology - Cell",
-      improvementTrend: "up",
-      totalSessions: 28,
-    },
-  ]);
+  const [students, setStudents] = useState<StudentData[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const name = localStorage.getItem("schoolName");
-    if (name) setSchoolName(name);
-  }, []);
+    const storedSchoolName = localStorage.getItem("schoolName");
+    const storedSchoolId = localStorage.getItem("schoolId");
+    
+    if (!storedSchoolId) {
+      navigate("/school-login");
+      return;
+    }
+    
+    if (storedSchoolName) {
+      setSchoolName(storedSchoolName);
+    }
+
+    loadStudents();
+  }, [navigate]);
+
+  const loadStudents = async () => {
+    try {
+      // Get the school ID from schools table
+      const { data: school } = await supabase
+        .from("schools")
+        .select("id")
+        .eq("school_id", "ips855108")
+        .maybeSingle();
+
+      if (!school) {
+        setLoading(false);
+        return;
+      }
+
+      // Get students for this school
+      const { data: studentsData } = await supabase
+        .from("students")
+        .select("*")
+        .eq("school_id", school.id);
+
+      if (studentsData) {
+        const today = new Date().toDateString();
+        
+        // Get sessions for all students
+        const studentIds = studentsData.map(s => s.id);
+        const { data: sessions } = await supabase
+          .from("study_sessions")
+          .select("*")
+          .in("student_id", studentIds);
+
+        const formattedStudents: StudentData[] = studentsData.map((student) => {
+          const studentSessions = sessions?.filter(s => s.student_id === student.id) || [];
+          const todaySessions = studentSessions.filter(s => 
+            new Date(s.created_at).toDateString() === today
+          );
+          const latestSession = todaySessions[0];
+
+          // Calculate trend based on recent scores
+          const recentScores = studentSessions.slice(0, 5).map(s => s.improvement_score || 50);
+          let trend: "up" | "down" | "stable" = "stable";
+          if (recentScores.length >= 2) {
+            const avg1 = recentScores.slice(0, 2).reduce((a, b) => a + b, 0) / 2;
+            const avg2 = recentScores.slice(-2).reduce((a, b) => a + b, 0) / 2;
+            if (avg1 > avg2 + 5) trend = "up";
+            else if (avg1 < avg2 - 5) trend = "down";
+          }
+
+          return {
+            id: student.id,
+            photo: student.photo_url || "",
+            name: student.full_name,
+            class: student.class,
+            todayStudied: todaySessions.length > 0,
+            topicStudied: latestSession?.topic || "-",
+            improvementTrend: trend,
+            totalSessions: studentSessions.length,
+          };
+        });
+
+        setStudents(formattedStudents);
+      }
+    } catch (error) {
+      console.error("Error loading students:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.clear();
@@ -121,17 +138,6 @@ const SchoolDashboard = () => {
     improving: students.filter((s) => s.improvementTrend === "up").length,
   };
 
-  const getTrendIcon = (trend: "up" | "down" | "stable") => {
-    switch (trend) {
-      case "up":
-        return <TrendingUp className="w-4 h-4 text-accent" />;
-      case "down":
-        return <TrendingDown className="w-4 h-4 text-destructive" />;
-      default:
-        return <Minus className="w-4 h-4 text-muted-foreground" />;
-    }
-  };
-
   const getTrendLabel = (trend: "up" | "down" | "stable") => {
     switch (trend) {
       case "up":
@@ -142,6 +148,19 @@ const SchoolDashboard = () => {
         return <span className="text-muted-foreground font-medium">Stable →</span>;
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <Building2 className="w-6 h-6 text-accent-foreground" />
+          </div>
+          <p className="text-muted-foreground">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -223,88 +242,114 @@ const SchoolDashboard = () => {
             <h2 className="font-bold">Student Activity</h2>
           </div>
           
-          {/* Desktop Table */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="text-left p-4 font-semibold">Student</th>
-                  <th className="text-left p-4 font-semibold">Class</th>
-                  <th className="text-left p-4 font-semibold">Today</th>
-                  <th className="text-left p-4 font-semibold">Topic Studied</th>
-                  <th className="text-left p-4 font-semibold">Trend</th>
-                  <th className="text-left p-4 font-semibold">Sessions</th>
-                </tr>
-              </thead>
-              <tbody>
+          {students.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">
+              <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No students registered yet.</p>
+              <p className="text-sm">Students will appear here once they sign up.</p>
+            </div>
+          ) : (
+            <>
+              {/* Desktop Table */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="text-left p-4 font-semibold">Student</th>
+                      <th className="text-left p-4 font-semibold">Class</th>
+                      <th className="text-left p-4 font-semibold">Today</th>
+                      <th className="text-left p-4 font-semibold">Topic Studied</th>
+                      <th className="text-left p-4 font-semibold">Trend</th>
+                      <th className="text-left p-4 font-semibold">Sessions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredStudents.map((student) => (
+                      <tr key={student.id} className="border-t border-border hover:bg-muted/30">
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
+                            {student.photo ? (
+                              <img 
+                                src={student.photo} 
+                                alt={student.name}
+                                className="w-10 h-10 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-lg font-bold">
+                                {student.name.charAt(0)}
+                              </div>
+                            )}
+                            <span className="font-medium">{student.name}</span>
+                          </div>
+                        </td>
+                        <td className="p-4 text-muted-foreground">{student.class}</td>
+                        <td className="p-4">
+                          {student.todayStudied ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-accent/10 text-accent text-sm">
+                              <CheckCircle className="w-4 h-4" /> Yes
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-muted text-muted-foreground text-sm">
+                              <XCircle className="w-4 h-4" /> No
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-4 text-muted-foreground">{student.topicStudied}</td>
+                        <td className="p-4">{getTrendLabel(student.improvementTrend)}</td>
+                        <td className="p-4 font-medium">{student.totalSessions}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Cards */}
+              <div className="md:hidden divide-y divide-border">
                 {filteredStudents.map((student) => (
-                  <tr key={student.id} className="border-t border-border hover:bg-muted/30">
-                    <td className="p-4">
+                  <div key={student.id} className="p-4">
+                    <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-lg font-bold">
-                          {student.name.charAt(0)}
+                        {student.photo ? (
+                          <img 
+                            src={student.photo} 
+                            alt={student.name}
+                            className="w-12 h-12 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center text-lg font-bold">
+                            {student.name.charAt(0)}
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-semibold">{student.name}</p>
+                          <p className="text-sm text-muted-foreground">{student.class}</p>
                         </div>
-                        <span className="font-medium">{student.name}</span>
                       </div>
-                    </td>
-                    <td className="p-4 text-muted-foreground">{student.class}</td>
-                    <td className="p-4">
                       {student.todayStudied ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-accent/10 text-accent text-sm">
-                          <CheckCircle className="w-4 h-4" /> Yes
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-accent/10 text-accent text-xs">
+                          <CheckCircle className="w-3 h-3" /> Studied
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-muted text-muted-foreground text-sm">
-                          <XCircle className="w-4 h-4" /> No
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-muted text-muted-foreground text-xs">
+                          <XCircle className="w-3 h-3" /> Not Yet
                         </span>
                       )}
-                    </td>
-                    <td className="p-4 text-muted-foreground">{student.topicStudied}</td>
-                    <td className="p-4">{getTrendLabel(student.improvementTrend)}</td>
-                    <td className="p-4 font-medium">{student.totalSessions}</td>
-                  </tr>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Topic: </span>
+                        {student.topicStudied}
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Trend: </span>
+                        {getTrendLabel(student.improvementTrend)}
+                      </div>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mobile Cards */}
-          <div className="md:hidden divide-y divide-border">
-            {filteredStudents.map((student) => (
-              <div key={student.id} className="p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center text-lg font-bold">
-                      {student.name.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="font-semibold">{student.name}</p>
-                      <p className="text-sm text-muted-foreground">{student.class}</p>
-                    </div>
-                  </div>
-                  {student.todayStudied ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-accent/10 text-accent text-xs">
-                      <CheckCircle className="w-3 h-3" /> Studied
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-muted text-muted-foreground text-xs">
-                      <XCircle className="w-3 h-3" /> Not Yet
-                    </span>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Topic: </span>
-                    {student.topicStudied}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Trend: </span>
-                    {getTrendLabel(student.improvementTrend)}
-                  </div>
-                </div>
               </div>
-            ))}
-          </div>
+            </>
+          )}
         </div>
       </main>
     </div>

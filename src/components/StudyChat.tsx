@@ -1,14 +1,24 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Image, Mic, X, Loader2 } from "lucide-react";
+import { Send, Image, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { ChatMessage } from "@/types";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+
+interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: Date;
+  imageUrl?: string;
+}
 
 interface StudyChatProps {
   onEndStudy: (summary: { topic: string; timeSpent: number; messages: ChatMessage[] }) => void;
 }
 
 const StudyChat = ({ onEndStudy }: StudyChatProps) => {
+  const { toast } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "1",
@@ -34,28 +44,37 @@ const StudyChat = ({ onEndStudy }: StudyChatProps) => {
     scrollToBottom();
   }, [messages]);
 
-  const getAIResponse = (userMessage: string, hasImage: boolean): string => {
-    // Simulated AI responses - will be replaced with actual OpenAI integration
-    const responses = [
-      "Achha, ye topic interesting hai! Chal main samjhata hoon...\n\nIs concept ka main point ye hai ki...",
-      "Bhai, good question! Dekh, iska simple explanation ye hai:\n\n1. Pehle ye samajh...\n2. Phir ye dekh...\n3. Ab ye connect kar...",
-      "Hmm, let me help you understand better. Isko aise soch:\n\nJab tum ye padh rahe ho, important points note karo...",
-      "Great progress! Ab ek quick question - jo tune abhi padha, usme sabse important cheez kya lagi?",
-      "Bahut achha! Tu sahi direction mein hai. Ab thoda deeper jaate hain...",
-    ];
+  const getAIResponse = async (conversationHistory: ChatMessage[]) => {
+    try {
+      // Format messages for the API
+      const formattedMessages = conversationHistory.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+        imageUrl: msg.imageUrl
+      }));
 
-    if (hasImage) {
-      return "Image dekh liya maine! 👀\n\nYe notes mein jo likha hai, let me explain:\n\n• Pehla point important hai exam ke liye\n• Doosra formula yaad rakhna\n• Ye diagram samajh le achhe se\n\nKoi doubt ho toh pooch!";
+      const { data, error } = await supabase.functions.invoke('study-chat', {
+        body: { messages: formattedMessages }
+      });
+
+      if (error) {
+        console.error("Edge function error:", error);
+        throw error;
+      }
+
+      if (data?.error) {
+        toast({
+          title: "AI Error",
+          description: data.error,
+          variant: "destructive"
+        });
+      }
+
+      return data?.response || "Sorry bhai, kuch problem ho gaya. Phir se try kar!";
+    } catch (err) {
+      console.error("AI response error:", err);
+      return "Oops! Connection mein problem hai. Thodi der baad try karo! 🙏";
     }
-
-    // Extract topic if mentioned
-    const topicKeywords = ["physics", "chemistry", "maths", "biology", "history", "geography", "english", "hindi"];
-    const foundTopic = topicKeywords.find((t) => userMessage.toLowerCase().includes(t));
-    if (foundTopic && !currentTopic) {
-      setCurrentTopic(foundTopic.charAt(0).toUpperCase() + foundTopic.slice(1));
-    }
-
-    return responses[Math.floor(Math.random() * responses.length)];
   };
 
   const handleSendMessage = async () => {
@@ -69,28 +88,46 @@ const StudyChat = ({ onEndStudy }: StudyChatProps) => {
       imageUrl: selectedImage || undefined,
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
     setInputValue("");
     const hadImage = !!selectedImage;
     setSelectedImage(null);
     setIsLoading(true);
 
-    // Simulate AI response delay
-    setTimeout(() => {
-      const aiResponse: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: getAIResponse(inputValue, hadImage),
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, aiResponse]);
-      setIsLoading(false);
-    }, 1500);
+    // Extract topic from message
+    const topicKeywords = ["physics", "chemistry", "maths", "math", "biology", "history", "geography", "english", "hindi", "science", "social"];
+    const foundTopic = topicKeywords.find((t) => inputValue.toLowerCase().includes(t));
+    if (foundTopic && !currentTopic) {
+      setCurrentTopic(foundTopic.charAt(0).toUpperCase() + foundTopic.slice(1));
+    }
+
+    // Get AI response
+    const aiResponseText = await getAIResponse(newMessages);
+    
+    const aiResponse: ChatMessage = {
+      id: (Date.now() + 1).toString(),
+      role: "assistant",
+      content: aiResponseText,
+      timestamp: new Date(),
+    };
+    
+    setMessages((prev) => [...prev, aiResponse]);
+    setIsLoading(false);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "Image too large",
+          description: "Please upload an image smaller than 5MB",
+          variant: "destructive"
+        });
+        return;
+      }
+      
       const reader = new FileReader();
       reader.onloadend = () => {
         setSelectedImage(reader.result as string);
@@ -209,6 +246,7 @@ const StudyChat = ({ onEndStudy }: StudyChatProps) => {
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
             className="flex-1"
+            disabled={isLoading}
           />
           <Button
             variant="hero"
