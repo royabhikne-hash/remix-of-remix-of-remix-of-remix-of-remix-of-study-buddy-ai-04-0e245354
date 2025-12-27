@@ -1,11 +1,32 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SYSTEM_PROMPT = `You are an AI Study Buddy for Indian students. You chat in Hinglish (Hindi-English mix) in a friendly, supportive way.
+const buildSystemPrompt = (pastSessions: any[], weakAreas: string[], strongAreas: string[]) => {
+  let personalizedContext = "";
+  
+  if (pastSessions.length > 0) {
+    const recentTopics = [...new Set(pastSessions.slice(0, 10).map(s => s.topic))].slice(0, 5);
+    personalizedContext = `
+STUDENT'S LEARNING HISTORY:
+- Recent topics studied: ${recentTopics.join(", ") || "None yet"}
+- Weak areas needing revision: ${weakAreas.join(", ") || "None identified yet"}
+- Strong areas: ${strongAreas.join(", ") || "None identified yet"}
+- Total sessions: ${pastSessions.length}
+
+Use this history to:
+1. Reference previously studied topics when relevant
+2. Suggest revising weak areas when appropriate
+3. Build on strong areas to boost confidence
+4. Provide personalized study recommendations
+`;
+  }
+
+  return `You are an AI Study Buddy for Indian students. You chat in Hinglish (Hindi-English mix) in a friendly, supportive way.
 
 Your personality:
 - Friendly and encouraging like a helpful older brother/sister
@@ -14,6 +35,8 @@ Your personality:
 - Use examples from daily life when possible
 - Be patient and never make fun of mistakes
 
+${personalizedContext}
+
 Your responsibilities during study sessions:
 1. Greet warmly and ask what they're studying today
 2. Explain topics in simple Hinglish
@@ -21,21 +44,26 @@ Your responsibilities during study sessions:
 4. Highlight important exam points
 5. Ask 2-3 quick understanding questions
 6. Detect confusion or weak areas
-7. Suggest what to revise next
+7. Suggest what to revise next based on their history
 8. Be encouraging about their progress
+9. If they've studied a topic before, remind them and build on it
+10. Proactively suggest revising weak areas when appropriate
 
 When analyzing uploaded images of notes/books:
 1. Identify the topic and key concepts
 2. Explain what's shown in simple terms
 3. Point out important formulas or facts
 4. Connect to what they should know for exams
+5. Link to previously studied related topics
 
 Keep responses concise (under 200 words usually) but helpful. Always end with encouragement or a question to keep them engaged.
 
 Example responses:
 - "Achha, ye topic thoda tricky hai but don't worry, main explain karta hoon..."
 - "Bhai, ye formula yaad rakh - exam mein zaroor aayega!"
-- "Good progress! Ab batao, tune jo padha usme sabse important cheez kya lagi?"`;
+- "Good progress! Ab batao, tune jo padha usme sabse important cheez kya lagi?"
+- "Arre, tu pichle hafte bhi ye topic padh raha tha - ab revise karte hain!"`;
+};
 
 interface ChatMessage {
   role: string;
@@ -49,13 +77,12 @@ interface AIMessage {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { messages } = await req.json();
+    const { messages, studentId } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!LOVABLE_API_KEY) {
@@ -65,16 +92,62 @@ serve(async (req) => {
 
     console.log("Processing study chat request with", messages?.length || 0, "messages");
 
+    // Fetch student's past sessions for personalization
+    let pastSessions: any[] = [];
+    let weakAreas: string[] = [];
+    let strongAreas: string[] = [];
+
+    if (studentId) {
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        const { data: sessions } = await supabase
+          .from("study_sessions")
+          .select("topic, subject, understanding_level, weak_areas, strong_areas, created_at")
+          .eq("student_id", studentId)
+          .order("created_at", { ascending: false })
+          .limit(20);
+
+        if (sessions) {
+          pastSessions = sessions;
+          
+          // Aggregate weak and strong areas
+          const weakSet = new Set<string>();
+          const strongSet = new Set<string>();
+          
+          sessions.forEach(s => {
+            (s.weak_areas || []).forEach((a: string) => weakSet.add(a));
+            (s.strong_areas || []).forEach((a: string) => strongSet.add(a));
+          });
+          
+          weakAreas = [...weakSet].slice(0, 5);
+          strongAreas = [...strongSet].slice(0, 5);
+        }
+
+        console.log("Loaded student history:", { 
+          sessions: pastSessions.length, 
+          weakAreas, 
+          strongAreas 
+        });
+      } catch (err) {
+        console.error("Error fetching student history:", err);
+      }
+    }
+
+    // Build personalized system prompt
+    const systemPrompt = buildSystemPrompt(pastSessions, weakAreas, strongAreas);
+
     // Build messages array
     const chatMessages: AIMessage[] = [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: systemPrompt },
     ];
 
     // Add conversation history
     if (messages && Array.isArray(messages)) {
       for (const msg of messages as ChatMessage[]) {
         if (msg.imageUrl) {
-          // Handle image messages with vision
           chatMessages.push({
             role: msg.role,
             content: [
@@ -138,7 +211,14 @@ serve(async (req) => {
     console.log("AI response received successfully");
 
     return new Response(
-      JSON.stringify({ response: aiResponse }),
+      JSON.stringify({ 
+        response: aiResponse,
+        studentHistory: {
+          recentTopics: pastSessions.slice(0, 5).map(s => s.topic),
+          weakAreas,
+          strongAreas
+        }
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 

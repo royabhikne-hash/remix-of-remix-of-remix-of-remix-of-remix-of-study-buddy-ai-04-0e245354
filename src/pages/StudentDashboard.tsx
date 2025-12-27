@@ -10,6 +10,7 @@ import {
   Play,
   CheckCircle,
   User,
+  BarChart3,
 } from "lucide-react";
 import StudyChat from "@/components/StudyChat";
 import { useToast } from "@/hooks/use-toast";
@@ -190,7 +191,7 @@ const StudentDashboard = () => {
     return (
       <div className="min-h-screen bg-background p-4">
         <div className="container mx-auto max-w-4xl">
-          <StudyChat onEndStudy={handleEndStudy} />
+          <StudyChat onEndStudy={handleEndStudy} studentId={studentId || undefined} />
         </div>
       </div>
     );
@@ -242,6 +243,10 @@ const StudentDashboard = () => {
             <Button variant="hero" size="xl" onClick={handleStartStudy}>
               <Play className="w-5 h-5" />
               Start Studying
+            </Button>
+            <Button variant="outline" size="lg" onClick={() => navigate("/progress")} className="ml-3">
+              <BarChart3 className="w-4 h-4 mr-2" />
+              View Progress
             </Button>
           </div>
         </div>

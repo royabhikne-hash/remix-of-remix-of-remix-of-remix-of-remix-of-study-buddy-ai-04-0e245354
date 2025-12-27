@@ -15,9 +15,10 @@ interface ChatMessage {
 
 interface StudyChatProps {
   onEndStudy: (summary: { topic: string; timeSpent: number; messages: ChatMessage[] }) => void;
+  studentId?: string;
 }
 
-const StudyChat = ({ onEndStudy }: StudyChatProps) => {
+const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
   const { toast } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -54,7 +55,7 @@ const StudyChat = ({ onEndStudy }: StudyChatProps) => {
       }));
 
       const { data, error } = await supabase.functions.invoke('study-chat', {
-        body: { messages: formattedMessages }
+        body: { messages: formattedMessages, studentId }
       });
 
       if (error) {
