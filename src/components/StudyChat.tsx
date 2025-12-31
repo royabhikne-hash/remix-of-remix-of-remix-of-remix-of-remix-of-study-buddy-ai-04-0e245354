@@ -382,28 +382,46 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
   const currentQuestion = quizQuestions[currentQuestionIndex];
 
   return (
-    <div className="flex flex-col h-[calc(100vh-200px)] bg-card rounded-2xl border border-border overflow-hidden">
-      {/* Chat Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-secondary/30">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
-            <span className="text-lg">🤖</span>
+    <div className="flex flex-col h-[calc(100vh-180px)] bg-gradient-to-b from-card to-background rounded-3xl border border-border/50 overflow-hidden shadow-xl">
+      {/* Chat Header - Modern Design */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border/30 bg-gradient-to-r from-primary/10 via-accent/5 to-primary/10 backdrop-blur-sm">
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/25">
+              <span className="text-xl">🤖</span>
+            </div>
+            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-accent rounded-full border-2 border-background animate-pulse"></div>
           </div>
           <div>
-            <h3 className="font-semibold">AI Study Buddy</h3>
-            <p className="text-xs text-muted-foreground">
-              {isQuizMode ? `Quiz: ${currentQuestionIndex + 1}/${quizQuestions.length}` : currentTopic ? `Studying: ${currentTopic}` : "Ready to help!"}
+            <h3 className="font-bold text-lg bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">AI Study Buddy</h3>
+            <p className="text-sm text-muted-foreground flex items-center gap-2">
+              {isQuizMode ? (
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 bg-warning rounded-full animate-pulse"></span>
+                  Quiz Mode: {currentQuestionIndex + 1}/{quizQuestions.length}
+                </span>
+              ) : currentTopic ? (
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 bg-accent rounded-full"></span>
+                  {currentTopic}
+                </span>
+              ) : (
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse"></span>
+                  Ready to help!
+                </span>
+              )}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <Button 
-            variant="outline" 
+            variant={showAnalysis ? "secondary" : "outline"} 
             size="sm" 
             onClick={() => setShowAnalysis(!showAnalysis)}
-            className="hidden sm:flex"
+            className="hidden sm:flex rounded-xl border-border/50 hover:bg-primary/10"
           >
-            <Brain className="w-4 h-4 mr-1" />
+            <Brain className="w-4 h-4 mr-1.5" />
             Analysis
           </Button>
           {!isQuizMode && (
@@ -412,6 +430,7 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
               size="sm" 
               onClick={handleEndStudyClick}
               disabled={quizLoading}
+              className="rounded-xl shadow-lg shadow-destructive/20"
             >
               {quizLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "End Study"}
             </Button>
@@ -419,72 +438,83 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
         </div>
       </div>
 
-      {/* Real-time Analysis Panel */}
+      {/* Real-time Analysis Panel - Enhanced */}
       {showAnalysis && (
-        <div className="px-4 py-3 bg-muted/50 border-b border-border space-y-2">
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">Understanding:</span>
-            <span className={`font-semibold capitalize ${getUnderstandingColor()}`}>
-              {analysis.currentUnderstanding}
-            </span>
-          </div>
-          {analysis.topicsCovered.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              <span className="text-xs text-muted-foreground">Topics:</span>
-              {analysis.topicsCovered.slice(0, 3).map((topic, i) => (
-                <span key={i} className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full">
-                  {topic}
-                </span>
-              ))}
+        <div className="px-5 py-4 bg-gradient-to-r from-muted/80 to-muted/40 border-b border-border/30 backdrop-blur-sm">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Understanding:</span>
+              <span className={`font-bold text-sm capitalize px-3 py-1 rounded-full ${
+                analysis.currentUnderstanding === "excellent" ? "bg-accent/20 text-accent" :
+                analysis.currentUnderstanding === "good" ? "bg-primary/20 text-primary" :
+                analysis.currentUnderstanding === "average" ? "bg-warning/20 text-warning" :
+                "bg-destructive/20 text-destructive"
+              }`}>
+                {analysis.currentUnderstanding}
+              </span>
             </div>
-          )}
-          <div className="flex gap-4 text-xs">
+            {analysis.topicsCovered.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-muted-foreground">Topics:</span>
+                {analysis.topicsCovered.slice(0, 3).map((topic, i) => (
+                  <span key={i} className="text-xs px-2.5 py-1 bg-primary/15 text-primary rounded-full font-medium">
+                    {topic}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-4 mt-3 text-sm">
             {analysis.strongAreas.length > 0 && (
-              <div className="flex items-center gap-1 text-accent">
-                <TrendingUp className="w-3 h-3" />
-                Strong: {analysis.strongAreas.slice(0, 2).join(", ")}
+              <div className="flex items-center gap-1.5 text-accent bg-accent/10 px-3 py-1.5 rounded-full">
+                <TrendingUp className="w-4 h-4" />
+                <span className="font-medium">Strong:</span> {analysis.strongAreas.slice(0, 2).join(", ")}
               </div>
             )}
             {analysis.weakAreas.length > 0 && (
-              <div className="flex items-center gap-1 text-warning">
-                <AlertTriangle className="w-3 h-3" />
-                Needs work: {analysis.weakAreas.slice(0, 2).join(", ")}
+              <div className="flex items-center gap-1.5 text-warning bg-warning/10 px-3 py-1.5 rounded-full">
+                <AlertTriangle className="w-4 h-4" />
+                <span className="font-medium">Needs work:</span> {analysis.weakAreas.slice(0, 2).join(", ")}
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      {/* Messages Area - Enhanced */}
+      <div className="flex-1 overflow-y-auto p-5 space-y-4 scroll-smooth">
         {messages.map((message) => (
           <div
             key={message.id}
             className={`flex ${message.role === "user" ? "justify-end" : "justify-start"} animate-fade-in`}
           >
-            <div className={`${message.role === "user" ? "chat-bubble-user" : "chat-bubble-ai"} relative group`}>
+            <div className={`max-w-[85%] ${
+              message.role === "user" 
+                ? "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground rounded-2xl rounded-br-md px-4 py-3 shadow-lg shadow-primary/20" 
+                : "bg-gradient-to-br from-secondary to-secondary/80 text-secondary-foreground rounded-2xl rounded-bl-md px-4 py-3 shadow-md border border-border/30"
+            } relative group`}>
               {message.imageUrl && (
                 <img
                   src={message.imageUrl}
                   alt="Uploaded"
-                  className="max-w-[200px] rounded-lg mb-2"
+                  className="max-w-[200px] rounded-xl mb-2 shadow-md"
                 />
               )}
-              <p className="whitespace-pre-wrap">{message.content}</p>
-              <div className="flex items-center justify-between mt-1">
+              <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+              <div className="flex items-center justify-between mt-2 pt-1 border-t border-current/10">
                 <span className="text-xs opacity-60">
                   {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </span>
                 {message.role === "assistant" && (
                   <button
                     onClick={() => speakText(message.content, message.id)}
-                    className="ml-2 p-1 rounded-full hover:bg-primary/10 transition-colors"
+                    className="ml-2 p-1.5 rounded-full hover:bg-foreground/10 transition-all duration-200"
                     title="Read aloud"
                   >
                     {speakingMessageId === message.id ? (
-                      <VolumeX className="w-4 h-4 text-primary" />
+                      <VolumeX className="w-4 h-4 text-primary animate-pulse" />
                     ) : (
-                      <Volume2 className="w-4 h-4 text-muted-foreground hover:text-primary" />
+                      <Volume2 className="w-4 h-4 opacity-60 hover:opacity-100" />
                     )}
                   </button>
                 )}
@@ -609,9 +639,13 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
         
         {isLoading && (
           <div className="flex justify-start animate-fade-in">
-            <div className="chat-bubble-ai flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Typing...</span>
+            <div className="bg-gradient-to-br from-secondary to-secondary/80 rounded-2xl rounded-bl-md px-4 py-3 shadow-md border border-border/30 flex items-center gap-3">
+              <div className="flex gap-1">
+                <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{animationDelay: "0ms"}}></div>
+                <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{animationDelay: "150ms"}}></div>
+                <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{animationDelay: "300ms"}}></div>
+              </div>
+              <span className="text-sm text-muted-foreground">Typing...</span>
             </div>
           </div>
         )}
@@ -619,13 +653,13 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Image Preview */}
+      {/* Image Preview - Enhanced */}
       {selectedImage && (
-        <div className="px-4 py-2 bg-secondary/30 border-t border-border">
+        <div className="px-5 py-3 bg-gradient-to-r from-secondary/50 to-secondary/30 border-t border-border/30">
           <div className="relative inline-block">
-            <img src={selectedImage} alt="Preview" className="h-20 rounded-lg" />
+            <img src={selectedImage} alt="Preview" className="h-24 rounded-xl shadow-md border border-border/50" />
             <button
-              className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center"
+              className="absolute -top-2 -right-2 w-7 h-7 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
               onClick={() => setSelectedImage(null)}
             >
               <X className="w-4 h-4" />
@@ -634,10 +668,10 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
         </div>
       )}
 
-      {/* Input Area - Hide during quiz */}
+      {/* Input Area - Modern Design */}
       {!isQuizMode && (
-        <div className="p-4 border-t border-border bg-background">
-          <div className="flex items-center gap-2">
+        <div className="p-4 border-t border-border/30 bg-gradient-to-r from-background via-secondary/20 to-background">
+          <div className="flex items-center gap-3 bg-muted/50 rounded-2xl p-2 border border-border/30 shadow-inner">
             <input
               ref={fileInputRef}
               type="file"
@@ -649,27 +683,34 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
               variant="ghost"
               size="icon"
               onClick={() => fileInputRef.current?.click()}
-              className="shrink-0"
+              className="shrink-0 rounded-xl hover:bg-primary/10"
             >
-              <Image className="w-5 h-5" />
+              <Image className="w-5 h-5 text-muted-foreground" />
             </Button>
             <Input
-              placeholder="Type your message..."
+              placeholder="Apna message type karo..."
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={handleKeyPress}
-              className="flex-1"
+              className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/60"
               disabled={isLoading}
             />
             <Button
-              variant="hero"
               size="icon"
               onClick={handleSendMessage}
               disabled={isLoading || (!inputValue.trim() && !selectedImage)}
+              className="shrink-0 rounded-xl bg-gradient-to-r from-primary to-accent hover:opacity-90 shadow-lg shadow-primary/25 disabled:opacity-40"
             >
-              <Send className="w-5 h-5" />
+              {isLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Send className="w-5 h-5" />
+              )}
             </Button>
           </div>
+          <p className="text-xs text-center text-muted-foreground/60 mt-2">
+            Image upload kar sakte ho notes ya books ke liye 📸
+          </p>
         </div>
       )}
     </div>
