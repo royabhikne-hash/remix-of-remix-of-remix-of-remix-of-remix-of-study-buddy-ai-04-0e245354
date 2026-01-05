@@ -106,7 +106,6 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [voiceSpeed, setVoiceSpeed] = useState(1.0);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   
   // Quiz mode state
   const [isQuizMode, setIsQuizMode] = useState(false);
@@ -237,17 +236,17 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
     });
   };
 
-  // ElevenLabs Text-to-Speech function
-  const speakText = async (text: string, messageId: string) => {
+  // Web Speech API Text-to-Speech function (free, no API key needed)
+  const speakText = (text: string, messageId: string) => {
     // If already speaking this message, stop
     if (speakingMessageId === messageId) {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
+      window.speechSynthesis.cancel();
       setSpeakingMessageId(null);
       return;
     }
+
+    // Stop any ongoing speech
+    window.speechSynthesis.cancel();
 
     const cleanText = text.replace(/[🎉📚💪🤖👋✓✔❌⚠️🙏👍]/g, '').trim();
     
@@ -256,47 +255,35 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
     setSpeakingMessageId(messageId);
     
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({ text: cleanText, speed: voiceSpeed }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`TTS request failed: ${response.status}`);
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.lang = 'hi-IN'; // Hindi for Hinglish support
+      utterance.rate = voiceSpeed;
+      utterance.pitch = 1.0;
+      
+      // Try to find a Hindi male voice
+      const voices = window.speechSynthesis.getVoices();
+      const hindiVoice = voices.find(v => v.lang.includes('hi') && v.name.toLowerCase().includes('male')) ||
+                         voices.find(v => v.lang.includes('hi')) ||
+                         voices.find(v => v.lang.includes('en-IN'));
+      
+      if (hindiVoice) {
+        utterance.voice = hindiVoice;
       }
 
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-      audio.playbackRate = voiceSpeed;
-      audioRef.current = audio;
-      
-      audio.onended = () => {
+      utterance.onend = () => {
         setSpeakingMessageId(null);
-        URL.revokeObjectURL(audioUrl);
-        audioRef.current = null;
       };
-      
-      audio.onerror = () => {
+
+      utterance.onerror = () => {
         setSpeakingMessageId(null);
-        URL.revokeObjectURL(audioUrl);
-        audioRef.current = null;
         toast({
           title: "Audio Error",
           description: "Could not play audio",
           variant: "destructive"
         });
       };
-      
-      await audio.play();
+
+      window.speechSynthesis.speak(utterance);
     } catch (error) {
       console.error("TTS error:", error);
       setSpeakingMessageId(null);
