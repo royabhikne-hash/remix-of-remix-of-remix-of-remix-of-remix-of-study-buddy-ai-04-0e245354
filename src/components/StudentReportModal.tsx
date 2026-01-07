@@ -49,6 +49,14 @@ import {
   Clock,
   CheckCircle,
   Star,
+  Flame,
+  Zap,
+  Sun,
+  Moon,
+  Lightbulb,
+  GraduationCap,
+  Heart,
+  Activity,
 } from "lucide-react";
 
 interface StudentReportModalProps {
@@ -315,6 +323,232 @@ const StudentReportModal = ({
     .filter((s) => s.ai_summary)
     .map((s) => s.ai_summary!)
     .slice(0, 3);
+
+  // ========== NEW DETAILED METRICS ==========
+  
+  // Daily Breakdown
+  const getDailyBreakdown = () => {
+    const days: { day: string; date: string; sessions: number; timeSpent: number; quizzes: number; avgScore: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dayStr = date.toLocaleDateString("en-IN", { weekday: "short" });
+      const dateStr = date.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+      
+      const daySessions = sessions.filter((s) => {
+        const sessionDate = new Date(s.created_at);
+        return sessionDate.toDateString() === date.toDateString();
+      });
+      
+      const dayQuizzes = quizzes.filter((q) => {
+        const quizDate = new Date(q.created_at);
+        return quizDate.toDateString() === date.toDateString();
+      });
+      
+      const avgScore = daySessions.length > 0
+        ? Math.round(daySessions.reduce((acc, s) => acc + (s.improvement_score || 50), 0) / daySessions.length)
+        : 0;
+      
+      days.push({
+        day: dayStr,
+        date: dateStr,
+        sessions: daySessions.length,
+        timeSpent: daySessions.reduce((acc, s) => acc + (s.time_spent || 0), 0),
+        quizzes: dayQuizzes.length,
+        avgScore,
+      });
+    }
+    return days;
+  };
+  
+  const dailyBreakdown = getDailyBreakdown();
+  
+  // Study Streak Calculation
+  const calculateStudyStreak = () => {
+    let currentStreak = 0;
+    let longestStreak = 0;
+    let tempStreak = 0;
+    
+    for (let i = 0; i <= 6; i++) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      
+      const hasSession = sessions.some((s) => {
+        const sessionDate = new Date(s.created_at);
+        return sessionDate.toDateString() === date.toDateString();
+      });
+      
+      if (hasSession) {
+        tempStreak++;
+        if (i === 0 || currentStreak > 0) currentStreak++;
+      } else {
+        if (i === 0) currentStreak = 0;
+        if (tempStreak > longestStreak) longestStreak = tempStreak;
+        tempStreak = 0;
+      }
+    }
+    if (tempStreak > longestStreak) longestStreak = tempStreak;
+    
+    return { currentStreak, longestStreak };
+  };
+  
+  const studyStreak = calculateStudyStreak();
+  
+  // Learning Patterns (time of day)
+  const getLearningPatterns = () => {
+    const patterns = { morning: 0, afternoon: 0, evening: 0, night: 0 };
+    
+    sessions.forEach((s) => {
+      const hour = new Date(s.created_at).getHours();
+      if (hour >= 5 && hour < 12) patterns.morning++;
+      else if (hour >= 12 && hour < 17) patterns.afternoon++;
+      else if (hour >= 17 && hour < 21) patterns.evening++;
+      else patterns.night++;
+    });
+    
+    return patterns;
+  };
+  
+  const learningPatterns = getLearningPatterns();
+  const preferredStudyTime = Object.entries(learningPatterns).sort((a, b) => b[1] - a[1])[0];
+  
+  // Topic-wise Performance
+  const getTopicPerformance = () => {
+    const topicData: Record<string, { sessions: number; avgScore: number; totalScore: number; understanding: string[] }> = {};
+    
+    sessions.forEach((s) => {
+      const topic = s.topic || "General Study";
+      if (!topicData[topic]) {
+        topicData[topic] = { sessions: 0, avgScore: 0, totalScore: 0, understanding: [] };
+      }
+      topicData[topic].sessions++;
+      topicData[topic].totalScore += s.improvement_score || 50;
+      if (s.understanding_level) topicData[topic].understanding.push(s.understanding_level);
+    });
+    
+    return Object.entries(topicData)
+      .map(([topic, data]) => ({
+        topic,
+        sessions: data.sessions,
+        avgScore: Math.round(data.totalScore / data.sessions),
+        mostCommonUnderstanding: data.understanding.length > 0
+          ? data.understanding.sort((a, b) =>
+              data.understanding.filter(v => v === b).length - data.understanding.filter(v => v === a).length
+            )[0]
+          : "average",
+      }))
+      .sort((a, b) => b.sessions - a.sessions)
+      .slice(0, 8);
+  };
+  
+  const topicPerformance = getTopicPerformance();
+  
+  // Detailed Quiz Analytics
+  const getQuizAnalytics = () => {
+    if (quizzes.length === 0) return null;
+    
+    const totalCorrect = quizzes.reduce((acc, q) => acc + q.correct_count, 0);
+    const totalQuestions = quizzes.reduce((acc, q) => acc + q.total_questions, 0);
+    const avgAccuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+    
+    const accuracies = quizzes.map(q => q.accuracy_percentage || 0);
+    const bestQuiz = Math.max(...accuracies);
+    const worstQuiz = Math.min(...accuracies);
+    
+    // Performance trend
+    let quizTrend: "improving" | "declining" | "stable" = "stable";
+    if (quizzes.length >= 2) {
+      const recentAvg = quizzes.slice(0, Math.ceil(quizzes.length / 2)).reduce((acc, q) => acc + (q.accuracy_percentage || 0), 0) / Math.ceil(quizzes.length / 2);
+      const olderAvg = quizzes.slice(Math.ceil(quizzes.length / 2)).reduce((acc, q) => acc + (q.accuracy_percentage || 0), 0) / Math.floor(quizzes.length / 2);
+      if (recentAvg > olderAvg + 5) quizTrend = "improving";
+      else if (recentAvg < olderAvg - 5) quizTrend = "declining";
+    }
+    
+    return {
+      totalCorrect,
+      totalQuestions,
+      avgAccuracy,
+      bestQuiz,
+      worstQuiz,
+      quizTrend,
+      passRate: Math.round((quizzes.filter(q => (q.accuracy_percentage || 0) >= 50).length / quizzes.length) * 100),
+    };
+  };
+  
+  const quizAnalytics = getQuizAnalytics();
+  
+  // Generate Personalized Recommendations
+  const getRecommendations = () => {
+    const recommendations: string[] = [];
+    
+    if (studyStreak.currentStreak === 0) {
+      recommendations.push("🎯 शुरू करें! आज से पढ़ाई शुरू करें और streak बनाएं।");
+    } else if (studyStreak.currentStreak < 3) {
+      recommendations.push("🔥 बढ़िया! Streak जारी रखें, रोज़ाना पढ़ें।");
+    } else {
+      recommendations.push("🏆 शानदार! आपकी consistency कमाल की है!");
+    }
+    
+    if (weeklyStats.avgAccuracy < 50) {
+      recommendations.push("📖 Quiz accuracy बढ़ाने के लिए topics को दोबारा पढ़ें।");
+    } else if (weeklyStats.avgAccuracy >= 70) {
+      recommendations.push("⭐ Quiz performance excellent है! ऐसे ही जारी रखें।");
+    }
+    
+    if (topWeakAreas.length > 0) {
+      recommendations.push(`⚠️ इन topics पर ध्यान दें: ${topWeakAreas.slice(0, 2).map(([a]) => a).join(", ")}`);
+    }
+    
+    if (weeklyStats.totalTimeSpent < 60) {
+      recommendations.push("⏰ Study time बढ़ाएं - कम से कम 30 मिनट रोज़ाना पढ़ें।");
+    }
+    
+    if (preferredStudyTime && preferredStudyTime[1] > 0) {
+      const timeLabels: Record<string, string> = {
+        morning: "सुबह",
+        afternoon: "दोपहर", 
+        evening: "शाम",
+        night: "रात",
+      };
+      recommendations.push(`📚 Best study time: ${timeLabels[preferredStudyTime[0]]} - इस समय पढ़ना जारी रखें।`);
+    }
+    
+    return recommendations.slice(0, 5);
+  };
+  
+  const recommendations = getRecommendations();
+  
+  // Parent Tips
+  const parentTips = [
+    "👨‍👩‍👧 बच्चे के साथ रोज़ 10 मिनट पढ़ाई की बातें करें।",
+    "🌟 छोटी-छोटी उपलब्धियों की तारीफ़ करें।",
+    "📱 Screen time को study time में balance करें।",
+    "🏠 पढ़ाई के लिए शांत जगह का इंतेज़ाम करें।",
+  ];
+  
+  // Calculate Engagement Score
+  const calculateEngagementScore = () => {
+    let score = 0;
+    
+    // Sessions contribution (max 30)
+    score += Math.min(30, sessions.length * 5);
+    
+    // Time contribution (max 25)
+    score += Math.min(25, Math.round(weeklyStats.totalTimeSpent / 60) * 2);
+    
+    // Quiz contribution (max 20)
+    score += Math.min(20, weeklyStats.totalQuizzes * 5);
+    
+    // Streak contribution (max 15)
+    score += Math.min(15, studyStreak.currentStreak * 5);
+    
+    // Accuracy contribution (max 10)
+    score += Math.min(10, Math.round(weeklyStats.avgAccuracy / 10));
+    
+    return score;
+  };
+  
+  const engagementScore = calculateEngagementScore();
 
   // Chart data preparation
   const getProgressChartData = () => {
@@ -916,6 +1150,266 @@ const StudentReportModal = ({
                     </div>
                     <p className="text-sm text-muted-foreground font-medium">{gradeInfo.label}</p>
                   </div>
+                </div>
+              </div>
+
+              {/* Study Streak & Engagement Score */}
+              <div className="grid md:grid-cols-2 gap-6">
+                {/* Study Streak Card */}
+                <div className="bg-gradient-to-br from-orange-500/10 via-red-500/10 to-pink-500/10 rounded-2xl p-5 border border-orange-500/20">
+                  <h3 className="text-lg font-bold flex items-center gap-2 mb-4">
+                    <Flame className="w-5 h-5 text-orange-500" />
+                    Study Streak
+                  </h3>
+                  <div className="flex items-center justify-around">
+                    <div className="text-center">
+                      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center mx-auto mb-2">
+                        <span className="text-2xl font-bold text-white">{studyStreak.currentStreak}</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground font-medium">Current Streak</p>
+                      <p className="text-xs text-muted-foreground">days</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center mx-auto mb-2">
+                        <span className="text-2xl font-bold text-white">{studyStreak.longestStreak}</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground font-medium">Best Streak</p>
+                      <p className="text-xs text-muted-foreground">this week</p>
+                    </div>
+                  </div>
+                  {studyStreak.currentStreak >= 3 && (
+                    <div className="mt-4 text-center">
+                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-orange-500/20 text-orange-600 text-sm font-medium">
+                        🔥 On Fire! Keep it up!
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Engagement Score */}
+                <div className="bg-gradient-to-br from-primary/10 via-accent/10 to-purple-500/10 rounded-2xl p-5 border border-primary/20">
+                  <h3 className="text-lg font-bold flex items-center gap-2 mb-4">
+                    <Activity className="w-5 h-5 text-primary" />
+                    Engagement Score
+                  </h3>
+                  <div className="relative flex items-center justify-center">
+                    <div className="w-28 h-28 relative">
+                      <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="40"
+                          fill="none"
+                          stroke="hsl(var(--muted))"
+                          strokeWidth="10"
+                        />
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="40"
+                          fill="none"
+                          stroke="hsl(var(--primary))"
+                          strokeWidth="10"
+                          strokeDasharray={`${engagementScore * 2.51} 251`}
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="text-3xl font-bold text-primary">{engagementScore}</span>
+                        <span className="text-xs text-muted-foreground">/100</span>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-center mt-3 text-sm text-muted-foreground">
+                    {engagementScore >= 80 ? "🌟 Excellent Engagement!" : 
+                     engagementScore >= 60 ? "👍 Good Engagement" : 
+                     engagementScore >= 40 ? "💪 Keep Improving" : "🎯 Room to Grow"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Daily Breakdown */}
+              <div>
+                <h3 className="text-lg font-bold flex items-center gap-2 mb-4">
+                  <Calendar className="w-5 h-5 text-primary" />
+                  Daily Breakdown (पिछले 7 दिन)
+                </h3>
+                <div className="grid grid-cols-7 gap-2">
+                  {dailyBreakdown.map((day, i) => (
+                    <div 
+                      key={i}
+                      className={`rounded-xl p-3 text-center transition-all ${
+                        day.sessions > 0 
+                          ? "bg-gradient-to-br from-accent/20 to-accent/10 border border-accent/30" 
+                          : "bg-muted/50 border border-border"
+                      }`}
+                    >
+                      <p className="text-xs font-medium text-muted-foreground">{day.day}</p>
+                      <p className="text-[10px] text-muted-foreground">{day.date}</p>
+                      <div className="mt-2">
+                        {day.sessions > 0 ? (
+                          <>
+                            <p className="text-lg font-bold text-accent">{day.sessions}</p>
+                            <p className="text-[10px] text-muted-foreground">sessions</p>
+                            {day.timeSpent > 0 && (
+                              <p className="text-[10px] text-muted-foreground mt-1">
+                                {Math.round(day.timeSpent / 60)}m
+                              </p>
+                            )}
+                          </>
+                        ) : (
+                          <div className="h-8 flex items-center justify-center">
+                            <span className="text-muted-foreground text-lg">-</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Learning Patterns */}
+              <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-2xl p-5 border border-blue-500/20">
+                <h3 className="text-lg font-bold flex items-center gap-2 mb-4">
+                  <Clock className="w-5 h-5 text-blue-500" />
+                  Learning Patterns (पढ़ाई का समय)
+                </h3>
+                <div className="grid grid-cols-4 gap-3">
+                  {[
+                    { key: "morning", label: "Morning", subLabel: "सुबह (5-12)", icon: Sun, color: "text-yellow-500" },
+                    { key: "afternoon", label: "Afternoon", subLabel: "दोपहर (12-5)", icon: Sun, color: "text-orange-500" },
+                    { key: "evening", label: "Evening", subLabel: "शाम (5-9)", icon: Moon, color: "text-purple-500" },
+                    { key: "night", label: "Night", subLabel: "रात (9-5)", icon: Moon, color: "text-blue-500" },
+                  ].map(({ key, label, subLabel, icon: Icon, color }) => (
+                    <div 
+                      key={key}
+                      className={`rounded-xl p-3 text-center ${
+                        preferredStudyTime[0] === key ? "bg-primary/20 border-2 border-primary" : "bg-background/50"
+                      }`}
+                    >
+                      <Icon className={`w-5 h-5 mx-auto mb-1 ${color}`} />
+                      <p className="text-xs font-medium">{label}</p>
+                      <p className="text-[10px] text-muted-foreground">{subLabel}</p>
+                      <p className="text-lg font-bold mt-1">{learningPatterns[key as keyof typeof learningPatterns]}</p>
+                      <p className="text-[10px] text-muted-foreground">sessions</p>
+                    </div>
+                  ))}
+                </div>
+                {preferredStudyTime[1] > 0 && (
+                  <div className="mt-4 p-3 rounded-xl bg-background/50 text-center">
+                    <p className="text-sm">
+                      <span className="font-medium">Best Study Time:</span>{" "}
+                      <span className="text-primary font-bold capitalize">{preferredStudyTime[0]}</span>
+                      <span className="text-muted-foreground"> ({preferredStudyTime[1]} sessions)</span>
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Quiz Analytics */}
+              {quizAnalytics && (
+                <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-2xl p-5 border border-purple-500/20">
+                  <h3 className="text-lg font-bold flex items-center gap-2 mb-4">
+                    <GraduationCap className="w-5 h-5 text-purple-500" />
+                    Detailed Quiz Analytics
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div className="bg-background/50 rounded-xl p-3 text-center">
+                      <p className="text-2xl font-bold text-primary">{quizAnalytics.totalCorrect}</p>
+                      <p className="text-xs text-muted-foreground">Total Correct</p>
+                      <p className="text-[10px] text-muted-foreground">out of {quizAnalytics.totalQuestions}</p>
+                    </div>
+                    <div className="bg-background/50 rounded-xl p-3 text-center">
+                      <p className="text-2xl font-bold text-accent">{quizAnalytics.avgAccuracy}%</p>
+                      <p className="text-xs text-muted-foreground">Avg Accuracy</p>
+                    </div>
+                    <div className="bg-background/50 rounded-xl p-3 text-center">
+                      <p className="text-2xl font-bold text-green-500">{quizAnalytics.bestQuiz}%</p>
+                      <p className="text-xs text-muted-foreground">Best Quiz</p>
+                    </div>
+                    <div className="bg-background/50 rounded-xl p-3 text-center">
+                      <p className="text-2xl font-bold text-orange-500">{quizAnalytics.passRate}%</p>
+                      <p className="text-xs text-muted-foreground">Pass Rate (≥50%)</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center gap-2">
+                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${
+                      quizAnalytics.quizTrend === "improving" ? "bg-accent/20 text-accent" :
+                      quizAnalytics.quizTrend === "declining" ? "bg-destructive/20 text-destructive" :
+                      "bg-muted text-muted-foreground"
+                    }`}>
+                      {quizAnalytics.quizTrend === "improving" ? "📈 Improving" :
+                       quizAnalytics.quizTrend === "declining" ? "📉 Needs Focus" :
+                       "➡️ Stable"}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Topic-wise Performance */}
+              {topicPerformance.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-bold flex items-center gap-2 mb-4">
+                    <BookOpen className="w-5 h-5 text-primary" />
+                    Topic-wise Performance
+                  </h3>
+                  <div className="grid md:grid-cols-2 gap-3">
+                    {topicPerformance.map((topic, i) => (
+                      <div key={i} className="bg-gradient-to-r from-muted/50 to-transparent rounded-xl p-4 border border-border/50">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-medium text-sm truncate flex-1">{topic.topic}</h4>
+                          <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${getUnderstandingColor(topic.mostCommonUnderstanding)}`}>
+                            {topic.mostCommonUnderstanding}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <span>{topic.sessions} sessions</span>
+                          <span>Avg Score: {topic.avgScore}%</span>
+                        </div>
+                        <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
+                          <div 
+                            className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all"
+                            style={{ width: `${topic.avgScore}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Recommendations */}
+              {recommendations.length > 0 && (
+                <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-2xl p-5 border border-green-500/20">
+                  <h3 className="text-lg font-bold flex items-center gap-2 mb-4">
+                    <Lightbulb className="w-5 h-5 text-green-500" />
+                    AI Recommendations (सुझाव)
+                  </h3>
+                  <div className="space-y-3">
+                    {recommendations.map((rec, i) => (
+                      <div key={i} className="flex items-start gap-3 p-3 bg-background/50 rounded-xl">
+                        <div className="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                          <span className="text-xs font-bold text-green-600">{i + 1}</span>
+                        </div>
+                        <p className="text-sm">{rec}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Parent Tips */}
+              <div className="bg-gradient-to-br from-pink-500/10 to-rose-500/10 rounded-2xl p-5 border border-pink-500/20">
+                <h3 className="text-lg font-bold flex items-center gap-2 mb-4">
+                  <Heart className="w-5 h-5 text-pink-500" />
+                  Tips for Parents (माता-पिता के लिए)
+                </h3>
+                <div className="grid md:grid-cols-2 gap-3">
+                  {parentTips.map((tip, i) => (
+                    <div key={i} className="flex items-start gap-3 p-3 bg-background/50 rounded-xl">
+                      <p className="text-sm">{tip}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
 
