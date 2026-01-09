@@ -160,18 +160,6 @@ const AdminDashboard = () => {
     }
   };
 
-  const generateSchoolCredentials = (name: string) => {
-    const prefix = name
-      .split(" ")
-      .map((word) => word.charAt(0).toLowerCase())
-      .join("")
-      .slice(0, 3);
-    const suffix = "855108";
-    const schoolId = `${prefix}${suffix}`;
-    const password = `${prefix}kne${suffix}`;
-    return { id: schoolId, password };
-  };
-
   const handleAddSchool = async () => {
     if (!newSchool.name.trim()) {
       toast({
@@ -183,31 +171,45 @@ const AdminDashboard = () => {
     }
 
     setAddingSchool(true);
-    const credentials = generateSchoolCredentials(newSchool.name);
 
     try {
-      const { error } = await supabase.from("schools").insert({
-        school_id: credentials.id,
-        password_hash: credentials.password,
-        name: newSchool.name,
-        district: newSchool.district || null,
-        state: newSchool.state || null,
-        email: newSchool.email || null,
-        contact_whatsapp: newSchool.contact_whatsapp || null,
+      // Use secure edge function to create school with cryptographically random credentials
+      const adminId = localStorage.getItem("adminId");
+      const sessionToken = localStorage.getItem("adminSessionToken");
+      
+      const { data, error } = await supabase.functions.invoke("secure-auth", {
+        body: {
+          action: "create_school",
+          adminCredentials: {
+            adminId,
+            sessionToken,
+          },
+          schoolData: {
+            name: newSchool.name,
+            district: newSchool.district || null,
+            state: newSchool.state || null,
+            email: newSchool.email || null,
+            contact_whatsapp: newSchool.contact_whatsapp || null,
+          },
+        },
       });
 
       if (error) {
-        if (error.code === "23505") {
+        throw error;
+      }
+
+      if (data.error) {
+        if (data.error.includes("23505") || data.error.includes("duplicate")) {
           toast({
             title: "School Already Exists",
             description: "A school with similar credentials already exists.",
             variant: "destructive",
           });
         } else {
-          throw error;
+          throw new Error(data.error);
         }
-      } else {
-        setGeneratedCredentials(credentials);
+      } else if (data.success) {
+        setGeneratedCredentials(data.credentials);
         toast({
           title: "School Added!",
           description: `${newSchool.name} has been added successfully.`,
@@ -229,12 +231,21 @@ const AdminDashboard = () => {
   const handleBanSchool = async (schoolId: string, ban: boolean) => {
     setActionLoading(schoolId);
     try {
-      const { error } = await supabase
-        .from("schools")
-        .update({ is_banned: ban })
-        .eq("id", schoolId);
+      const adminId = localStorage.getItem("adminId");
+      const sessionToken = localStorage.getItem("adminSessionToken");
+      
+      const { data, error } = await supabase.functions.invoke("secure-auth", {
+        body: {
+          action: "update_school",
+          adminCredentials: { adminId, sessionToken },
+          schoolData: {
+            schoolId,
+            updates: { is_banned: ban },
+          },
+        },
+      });
 
-      if (error) throw error;
+      if (error || data?.error) throw error || new Error(data.error);
 
       setSchools(prev => prev.map(s => 
         s.id === schoolId ? { ...s, is_banned: ban } : s
@@ -260,12 +271,21 @@ const AdminDashboard = () => {
   const handleToggleFee = async (schoolId: string, paid: boolean) => {
     setActionLoading(schoolId);
     try {
-      const { error } = await supabase
-        .from("schools")
-        .update({ fee_paid: paid })
-        .eq("id", schoolId);
+      const adminId = localStorage.getItem("adminId");
+      const sessionToken = localStorage.getItem("adminSessionToken");
+      
+      const { data, error } = await supabase.functions.invoke("secure-auth", {
+        body: {
+          action: "update_school",
+          adminCredentials: { adminId, sessionToken },
+          schoolData: {
+            schoolId,
+            updates: { fee_paid: paid },
+          },
+        },
+      });
 
-      if (error) throw error;
+      if (error || data?.error) throw error || new Error(data.error);
 
       setSchools(prev => prev.map(s => 
         s.id === schoolId ? { ...s, fee_paid: paid } : s
@@ -291,12 +311,18 @@ const AdminDashboard = () => {
   const handleDeleteSchool = async (schoolId: string) => {
     setActionLoading(schoolId);
     try {
-      const { error } = await supabase
-        .from("schools")
-        .delete()
-        .eq("id", schoolId);
+      const adminId = localStorage.getItem("adminId");
+      const sessionToken = localStorage.getItem("adminSessionToken");
+      
+      const { data, error } = await supabase.functions.invoke("secure-auth", {
+        body: {
+          action: "delete_school",
+          adminCredentials: { adminId, sessionToken },
+          schoolData: { schoolId },
+        },
+      });
 
-      if (error) throw error;
+      if (error || data?.error) throw error || new Error(data.error);
 
       setSchools(prev => prev.filter(s => s.id !== schoolId));
 

@@ -14,42 +14,69 @@ const SchoolLogin = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [rateLimitWait, setRateLimitWait] = useState<number | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      // Check school credentials from database
-      const { data: school, error } = await supabase
-        .from("schools")
-        .select("*")
-        .eq("school_id", schoolId)
-        .eq("password_hash", password)
-        .maybeSingle();
+      // Use secure auth edge function
+      const { data, error } = await supabase.functions.invoke("secure-auth", {
+        body: {
+          action: "login",
+          userType: "school",
+          identifier: schoolId,
+          password: password,
+        },
+      });
 
       if (error) {
         throw error;
       }
 
-      if (school) {
+      if (data.rateLimited) {
+        setRateLimitWait(data.waitSeconds);
+        toast({
+          title: "Too Many Attempts",
+          description: `Please wait ${Math.ceil(data.waitSeconds / 60)} minutes before trying again.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (data.error) {
+        toast({
+          title: "Login Failed",
+          description: data.error,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (data.success) {
+        // Store session securely
+        sessionStorage.setItem("schoolSession", JSON.stringify({
+          id: data.user.id,
+          schoolId: data.user.schoolId,
+          name: data.user.name,
+          feePaid: data.user.feePaid,
+          sessionToken: data.sessionToken,
+          timestamp: Date.now(),
+        }));
+        
+        // Also set localStorage for backward compatibility
         localStorage.setItem("userType", "school");
-        localStorage.setItem("schoolId", school.school_id);
-        localStorage.setItem("schoolUUID", school.id);
-        localStorage.setItem("schoolName", school.name);
-        // Store password for secure approve/reject calls (clears when tab closes)
-        sessionStorage.setItem("schoolPassword", password);
+        localStorage.setItem("schoolId", data.user.schoolId);
+        localStorage.setItem("schoolUUID", data.user.id);
+        localStorage.setItem("schoolName", data.user.name);
+        localStorage.setItem("schoolSessionToken", data.sessionToken);
+        
         toast({
           title: "Welcome!",
           description: "School dashboard access granted.",
         });
         navigate("/school-dashboard");
-      } else {
-        toast({
-          title: "Invalid Credentials",
-          description: "Please check your School ID and password.",
-          variant: "destructive",
-        });
       }
     } catch (error) {
       console.error("Login error:", error);
@@ -94,6 +121,14 @@ const SchoolLogin = () => {
                 </div>
               </div>
             </div>
+
+            {rateLimitWait && (
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 mb-6">
+                <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                  Too many login attempts. Please wait before trying again.
+                </p>
+              </div>
+            )}
 
             <form onSubmit={handleLogin} className="space-y-5">
               <div>

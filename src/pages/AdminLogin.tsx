@@ -14,40 +14,69 @@ const AdminLogin = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [rateLimitWait, setRateLimitWait] = useState<number | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      // Check admin credentials from database
-      const { data: admin, error } = await supabase
-        .from("admins")
-        .select("*")
-        .eq("admin_id", adminId)
-        .eq("password_hash", password)
-        .maybeSingle();
+      // Use secure auth edge function
+      const { data, error } = await supabase.functions.invoke("secure-auth", {
+        body: {
+          action: "login",
+          userType: "admin",
+          identifier: adminId,
+          password: password,
+        },
+      });
 
       if (error) {
         throw error;
       }
 
-      if (admin) {
+      if (data.rateLimited) {
+        setRateLimitWait(data.waitSeconds);
+        toast({
+          title: "Too Many Attempts",
+          description: `Please wait ${Math.ceil(data.waitSeconds / 60)} minutes before trying again.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (data.error) {
+        toast({
+          title: "Invalid Credentials",
+          description: data.error,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (data.success) {
+        // Store session securely (sessionStorage clears on tab close)
+        sessionStorage.setItem("adminSession", JSON.stringify({
+          id: data.user.id,
+          name: data.user.name,
+          role: data.user.role,
+          adminId: data.user.adminId,
+          sessionToken: data.sessionToken,
+          timestamp: Date.now(),
+        }));
+        
+        // Also set localStorage for backward compatibility with dashboard checks
         localStorage.setItem("userType", "admin");
-        localStorage.setItem("adminId", admin.id);
-        localStorage.setItem("adminName", admin.name);
-        localStorage.setItem("adminRole", admin.role);
+        localStorage.setItem("adminId", data.user.id);
+        localStorage.setItem("adminName", data.user.name);
+        localStorage.setItem("adminRole", data.user.role);
+        localStorage.setItem("adminSessionToken", data.sessionToken);
+        
         toast({
           title: "Welcome Admin!",
           description: "Admin dashboard access granted.",
         });
         navigate("/admin-dashboard");
-      } else {
-        toast({
-          title: "Invalid Credentials",
-          description: "Please check your Admin ID and password.",
-          variant: "destructive",
-        });
       }
     } catch (error) {
       console.error("Login error:", error);
@@ -92,6 +121,14 @@ const AdminLogin = () => {
                 </div>
               </div>
             </div>
+
+            {rateLimitWait && (
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 mb-6">
+                <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                  Too many login attempts. Please wait before trying again.
+                </p>
+              </div>
+            )}
 
             <form onSubmit={handleLogin} className="space-y-5">
               <div>

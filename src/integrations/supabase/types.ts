@@ -76,6 +76,33 @@ export type Database = {
           },
         ]
       }
+      login_attempts: {
+        Row: {
+          attempt_type: string
+          created_at: string | null
+          id: string
+          identifier: string
+          ip_address: string | null
+          success: boolean | null
+        }
+        Insert: {
+          attempt_type: string
+          created_at?: string | null
+          id?: string
+          identifier: string
+          ip_address?: string | null
+          success?: boolean | null
+        }
+        Update: {
+          attempt_type?: string
+          created_at?: string | null
+          id?: string
+          identifier?: string
+          ip_address?: string | null
+          success?: boolean | null
+        }
+        Relationships: []
+      }
       parent_reports: {
         Row: {
           created_at: string
