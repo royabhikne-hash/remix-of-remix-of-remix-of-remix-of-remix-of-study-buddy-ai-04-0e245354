@@ -157,39 +157,38 @@ const SchoolDashboard = () => {
         return;
       }
 
-      // Get students ONLY for this specific school
-      const { data: studentsData } = await supabase
-        .from("students")
-        .select("*")
-        .eq("school_id", id)
-        .eq("is_banned", false)
-        .order("created_at", { ascending: false });
+      // Use edge function to bypass RLS and get students for this school
+      const sessionToken = localStorage.getItem("schoolSessionToken");
+      const { data, error } = await supabase.functions.invoke("get-students", {
+        body: {
+          user_type: "school",
+          session_token: sessionToken,
+          school_id: id,
+        },
+      });
 
-      if (studentsData) {
+      if (error) {
+        console.error("Error fetching students:", error);
+        setLoading(false);
+        return;
+      }
+
+      if (data?.students) {
         const today = new Date().toDateString();
         
-        // Get sessions for approved students only
-        const approvedStudentIds = studentsData.filter(s => s.is_approved).map(s => s.id);
-        const { data: sessions } = approvedStudentIds.length > 0 
-          ? await supabase
-              .from("study_sessions")
-              .select("*")
-              .in("student_id", approvedStudentIds)
-          : { data: [] };
-
-        const formattedStudents: StudentData[] = studentsData.map((student) => {
-          const studentSessions = sessions?.filter(s => s.student_id === student.id) || [];
-          const todaySessions = studentSessions.filter(s => 
+        const formattedStudents: StudentData[] = data.students.map((student: any) => {
+          const studentSessions = student.study_sessions || [];
+          const todaySessions = studentSessions.filter((s: any) => 
             new Date(s.created_at).toDateString() === today
           );
           const latestSession = todaySessions[0];
 
           // Calculate trend based on recent scores
-          const recentScores = studentSessions.slice(0, 5).map(s => s.improvement_score || 50);
+          const recentScores = studentSessions.slice(0, 5).map((s: any) => s.improvement_score || 50);
           let trend: "up" | "down" | "stable" = "stable";
           if (recentScores.length >= 2) {
-            const avg1 = recentScores.slice(0, 2).reduce((a, b) => a + b, 0) / 2;
-            const avg2 = recentScores.slice(-2).reduce((a, b) => a + b, 0) / 2;
+            const avg1 = recentScores.slice(0, 2).reduce((a: number, b: number) => a + b, 0) / 2;
+            const avg2 = recentScores.slice(-2).reduce((a: number, b: number) => a + b, 0) / 2;
             if (avg1 > avg2 + 5) trend = "up";
             else if (avg1 < avg2 - 5) trend = "down";
           }

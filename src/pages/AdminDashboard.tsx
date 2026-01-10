@@ -128,25 +128,38 @@ const AdminDashboard = () => {
 
   const loadData = async () => {
     try {
-      // Load schools with student counts
-      const { data: schoolsData } = await supabase.from("schools").select("*");
-      const { data: studentsData } = await supabase.from("students").select("*, schools(name)");
+      // Use edge function to bypass RLS and get all data for admin
+      const sessionToken = localStorage.getItem("adminSessionToken");
+      const adminId = localStorage.getItem("adminId");
+      
+      const { data, error } = await supabase.functions.invoke("get-students", {
+        body: {
+          user_type: "admin",
+          session_token: `admin_${adminId}_${sessionToken}`,
+        },
+      });
 
-      if (schoolsData && studentsData) {
-        const schoolsWithCounts = schoolsData.map((school) => ({
+      if (error) {
+        console.error("Error fetching data:", error);
+        setLoading(false);
+        return;
+      }
+
+      if (data?.schools && data?.students) {
+        const schoolsWithCounts = data.schools.map((school: any) => ({
           ...school,
-          studentCount: studentsData.filter((s) => s.school_id === school.id).length,
+          studentCount: data.students.filter((s: any) => s.school_id === school.id).length,
           is_banned: school.is_banned || false,
           fee_paid: school.fee_paid !== false,
         }));
         setSchools(schoolsWithCounts);
 
-        const formattedStudents = studentsData.map((s) => ({
+        const formattedStudents = data.students.map((s: any) => ({
           id: s.id,
           full_name: s.full_name,
           class: s.class,
           parent_whatsapp: s.parent_whatsapp,
-          school_name: (s.schools as any)?.name || "No School",
+          school_name: s.schools?.name || "No School",
           photo_url: s.photo_url || undefined,
           is_banned: s.is_banned || false,
           is_approved: s.is_approved || false,
