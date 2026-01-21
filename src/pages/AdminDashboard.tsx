@@ -587,113 +587,124 @@ const AdminDashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 py-4">
+      <header className="border-b border-border bg-card sticky top-0 z-10">
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-destructive flex items-center justify-center">
-                <Shield className="w-6 h-6 text-destructive-foreground" />
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-destructive flex items-center justify-center flex-shrink-0">
+                <Shield className="w-4 h-4 sm:w-6 sm:h-6 text-destructive-foreground" />
               </div>
-              <div>
-                <span className="font-bold text-lg">Admin Panel</span>
-                <p className="text-xs text-muted-foreground">Welcome, {adminName}</p>
+              <div className="min-w-0">
+                <span className="font-bold text-sm sm:text-lg truncate block">Admin Panel</span>
+                <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Welcome, {adminName}</p>
               </div>
             </div>
-            <Button variant="ghost" size="icon" onClick={handleLogout}>
-              <LogOut className="w-5 h-5" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <LanguageToggle />
+              <Button variant="ghost" size="icon" onClick={handleLogout}>
+                <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
+              </Button>
+            </div>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-          <div className="edu-card p-4 text-center">
-            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-2">
-              <Users className="w-6 h-6 text-primary" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-4 mb-6 sm:mb-8">
+          <div className="edu-card p-3 sm:p-4 text-center">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-2">
+              <Users className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
             </div>
-            <p className="text-2xl font-bold">{stats.totalStudents}</p>
-            <p className="text-sm text-muted-foreground">Total Students</p>
+            <p className="text-xl sm:text-2xl font-bold">{stats.totalStudents}</p>
+            <p className="text-[10px] sm:text-sm text-muted-foreground">Students</p>
           </div>
-          <div className="edu-card p-4 text-center">
-            <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center mx-auto mb-2">
-              <Building2 className="w-6 h-6 text-accent" />
+          <div className="edu-card p-3 sm:p-4 text-center">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-accent/10 flex items-center justify-center mx-auto mb-2">
+              <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-accent" />
             </div>
-            <p className="text-2xl font-bold">{stats.totalSchools}</p>
-            <p className="text-sm text-muted-foreground">Total Schools</p>
+            <p className="text-xl sm:text-2xl font-bold">{stats.totalSchools}</p>
+            <p className="text-[10px] sm:text-sm text-muted-foreground">Schools</p>
           </div>
-          <div className="edu-card p-4 text-center">
-            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-2">
-              <TrendingUp className="w-6 h-6 text-primary" />
+          <div className="edu-card p-3 sm:p-4 text-center">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-2">
+              <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
             </div>
-            <p className="text-2xl font-bold">{stats.activeSchools}</p>
-            <p className="text-sm text-muted-foreground">Active Schools</p>
+            <p className="text-xl sm:text-2xl font-bold">{stats.activeSchools}</p>
+            <p className="text-[10px] sm:text-sm text-muted-foreground">Active Schools</p>
           </div>
-          <div className="edu-card p-4 text-center">
-            <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center mx-auto mb-2">
-              <Ban className="w-6 h-6 text-destructive" />
+          <div className="edu-card p-3 sm:p-4 text-center">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-destructive/10 flex items-center justify-center mx-auto mb-2">
+              <Ban className="w-5 h-5 sm:w-6 sm:h-6 text-destructive" />
             </div>
-            <p className="text-2xl font-bold">{stats.bannedSchools}</p>
-            <p className="text-sm text-muted-foreground">Banned</p>
+            <p className="text-xl sm:text-2xl font-bold">{stats.bannedSchools}</p>
+            <p className="text-[10px] sm:text-sm text-muted-foreground">Banned</p>
           </div>
-          <div className="edu-card p-4 text-center">
-            <div className="w-12 h-12 rounded-xl bg-warning/10 flex items-center justify-center mx-auto mb-2">
-              <DollarSign className="w-6 h-6 text-warning" />
+          <div className="edu-card p-3 sm:p-4 text-center col-span-2 sm:col-span-1">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-warning/10 flex items-center justify-center mx-auto mb-2">
+              <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-warning" />
             </div>
-            <p className="text-2xl font-bold">{stats.unpaidSchools}</p>
-            <p className="text-sm text-muted-foreground">Unpaid Fees</p>
+            <p className="text-xl sm:text-2xl font-bold">{stats.unpaidSchools}</p>
+            <p className="text-[10px] sm:text-sm text-muted-foreground">Unpaid Fees</p>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+        <div className="flex gap-2 mb-4 sm:mb-6 overflow-x-auto pb-2 -mx-3 px-3 sm:mx-0 sm:px-0">
           <Button
             variant={activeTab === "schools" ? "default" : "outline"}
             onClick={() => setActiveTab("schools")}
+            size="sm"
+            className="text-xs sm:text-sm whitespace-nowrap"
           >
-            <Building2 className="w-4 h-4 mr-2" />
+            <Building2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
             Schools
           </Button>
           <Button
             variant={activeTab === "students" ? "default" : "outline"}
             onClick={() => setActiveTab("students")}
+            size="sm"
+            className="text-xs sm:text-sm whitespace-nowrap"
           >
-            <Users className="w-4 h-4 mr-2" />
+            <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
             Students
           </Button>
           <Button
             variant={activeTab === "reports" ? "default" : "outline"}
             onClick={() => setActiveTab("reports")}
+            size="sm"
+            className="text-xs sm:text-sm whitespace-nowrap"
           >
-            <FileText className="w-4 h-4 mr-2" />
-            Send Reports
+            <FileText className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+            Reports
           </Button>
           <Button
             variant={activeTab === "student-reports" ? "default" : "outline"}
             onClick={() => setActiveTab("student-reports")}
+            size="sm"
+            className="text-xs sm:text-sm whitespace-nowrap"
           >
-            <ClipboardList className="w-4 h-4 mr-2" />
-            Student Reports
+            <ClipboardList className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+            Reports
           </Button>
         </div>
 
         {/* Search & Actions */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
             <Input
               placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-9 sm:pl-10 h-10 sm:h-12"
             />
           </div>
           {activeTab === "schools" && (
             <Dialog open={showAddSchool} onOpenChange={setShowAddSchool}>
               <DialogTrigger asChild>
-                <Button variant="hero">
-                  <Plus className="w-4 h-4 mr-2" />
+                <Button variant="hero" size="sm" className="text-xs sm:text-sm">
+                  <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                   Add School
                 </Button>
               </DialogTrigger>
@@ -805,33 +816,33 @@ const AdminDashboard = () => {
         {/* Content */}
         {activeTab === "schools" && (
           <div className="edu-card overflow-hidden">
-            <div className="p-4 border-b border-border bg-secondary/30">
-              <h2 className="font-bold">Registered Schools</h2>
+            <div className="p-3 sm:p-4 border-b border-border bg-secondary/30">
+              <h2 className="font-bold text-sm sm:text-base">Registered Schools</h2>
             </div>
             <div className="divide-y divide-border">
               {filteredSchools.map((school) => (
-                <div key={school.id} className={`p-4 ${school.is_banned ? 'bg-destructive/5' : !school.fee_paid ? 'bg-warning/5' : ''}`}>
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${school.is_banned ? 'bg-destructive/10' : !school.fee_paid ? 'bg-warning/10' : 'bg-accent/10'}`}>
-                        <Building2 className={`w-5 h-5 ${school.is_banned ? 'text-destructive' : !school.fee_paid ? 'text-warning' : 'text-accent'}`} />
+                <div key={school.id} className={`p-3 sm:p-4 ${school.is_banned ? 'bg-destructive/5' : !school.fee_paid ? 'bg-warning/5' : ''}`}>
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                      <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${school.is_banned ? 'bg-destructive/10' : !school.fee_paid ? 'bg-warning/10' : 'bg-accent/10'}`}>
+                        <Building2 className={`w-4 h-4 sm:w-5 sm:h-5 ${school.is_banned ? 'text-destructive' : !school.fee_paid ? 'text-warning' : 'text-accent'}`} />
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold">{school.name}</p>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+                          <p className="font-semibold text-sm sm:text-base truncate">{school.name}</p>
                           {school.is_banned && (
-                            <span className="px-2 py-0.5 rounded-full bg-destructive/10 text-destructive text-xs font-medium">Banned</span>
+                            <span className="px-1.5 sm:px-2 py-0.5 rounded-full bg-destructive/10 text-destructive text-[10px] sm:text-xs font-medium">Banned</span>
                           )}
                           {!school.fee_paid && !school.is_banned && (
-                            <span className="px-2 py-0.5 rounded-full bg-warning/10 text-warning text-xs font-medium">Unpaid</span>
+                            <span className="px-1.5 sm:px-2 py-0.5 rounded-full bg-warning/10 text-warning text-[10px] sm:text-xs font-medium">Unpaid</span>
                           )}
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          ID: {school.school_id} • {school.district || "N/A"} • {school.studentCount} students
+                        <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                          ID: {school.school_id} • {school.studentCount} students
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-1 sm:gap-2 ml-10 sm:ml-0">
                       {/* Fee Toggle */}
                       <Button
                         variant="outline"
@@ -844,9 +855,9 @@ const AdminDashboard = () => {
                           name: school.name,
                         })}
                         disabled={actionLoading === school.id}
-                        className={school.fee_paid ? "text-accent" : "text-warning"}
+                        className={`text-[10px] sm:text-xs h-7 sm:h-8 px-2 sm:px-3 ${school.fee_paid ? "text-accent" : "text-warning"}`}
                       >
-                        <DollarSign className="w-4 h-4 mr-1" />
+                        <DollarSign className="w-3 h-3 sm:w-4 sm:h-4 mr-0.5 sm:mr-1" />
                         {school.fee_paid ? "Paid" : "Unpaid"}
                       </Button>
                       
@@ -862,10 +873,9 @@ const AdminDashboard = () => {
                           name: school.name,
                         })}
                         disabled={actionLoading === school.id}
-                        className={school.is_banned ? "text-accent" : "text-destructive"}
+                        className={`text-[10px] sm:text-xs h-7 sm:h-8 px-2 sm:px-3 ${school.is_banned ? "text-accent" : "text-destructive"}`}
                       >
-                        {school.is_banned ? <CheckCircle className="w-4 h-4 mr-1" /> : <Ban className="w-4 h-4 mr-1" />}
-                        {school.is_banned ? "Unban" : "Ban"}
+                        {school.is_banned ? <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" /> : <Ban className="w-3 h-3 sm:w-4 sm:h-4" />}
                       </Button>
                       
                       {/* Delete */}
@@ -880,9 +890,9 @@ const AdminDashboard = () => {
                           name: school.name,
                         })}
                         disabled={actionLoading === school.id}
-                        className="text-destructive hover:bg-destructive/10"
+                        className="text-destructive hover:bg-destructive/10 h-7 sm:h-8 px-2 sm:px-3"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
                       </Button>
                     </div>
                   </div>
@@ -899,41 +909,41 @@ const AdminDashboard = () => {
 
         {activeTab === "students" && (
           <div className="edu-card overflow-hidden">
-            <div className="p-4 border-b border-border bg-secondary/30">
-              <h2 className="font-bold">All Students</h2>
+            <div className="p-3 sm:p-4 border-b border-border bg-secondary/30">
+              <h2 className="font-bold text-sm sm:text-base">All Students</h2>
             </div>
             <div className="divide-y divide-border">
               {filteredStudents.map((student) => (
-                <div key={student.id} className={`p-4 ${student.is_banned ? 'bg-destructive/5' : ''}`}>
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-3">
+                <div key={student.id} className={`p-3 sm:p-4 ${student.is_banned ? 'bg-destructive/5' : ''}`}>
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                       {student.photo_url ? (
                         <img 
                           src={student.photo_url} 
                           alt={student.full_name}
-                          className={`w-10 h-10 rounded-full object-cover border-2 ${student.is_banned ? 'border-destructive/30' : 'border-primary/20'}`}
+                          className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border-2 flex-shrink-0 ${student.is_banned ? 'border-destructive/30' : 'border-primary/20'}`}
                         />
                       ) : (
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold ${student.is_banned ? 'bg-destructive/10' : 'bg-primary/10'}`}>
+                        <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-sm sm:text-lg font-bold flex-shrink-0 ${student.is_banned ? 'bg-destructive/10' : 'bg-primary/10'}`}>
                           {student.full_name.charAt(0)}
                         </div>
                       )}
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold">{student.full_name}</p>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+                          <p className="font-semibold text-sm sm:text-base truncate">{student.full_name}</p>
                           {student.is_banned && (
-                            <span className="px-2 py-0.5 rounded-full bg-destructive/10 text-destructive text-xs font-medium">Banned</span>
+                            <span className="px-1.5 sm:px-2 py-0.5 rounded-full bg-destructive/10 text-destructive text-[10px] sm:text-xs font-medium">Banned</span>
                           )}
                           {!student.is_approved && !student.is_banned && (
-                            <span className="px-2 py-0.5 rounded-full bg-warning/10 text-warning text-xs font-medium">Pending</span>
+                            <span className="px-1.5 sm:px-2 py-0.5 rounded-full bg-warning/10 text-warning text-[10px] sm:text-xs font-medium">Pending</span>
                           )}
                         </div>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-xs sm:text-sm text-muted-foreground truncate">
                           {student.class} • {student.school_name}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-1 sm:gap-2 ml-10 sm:ml-0">
                       {/* Ban/Unban */}
                       <Button
                         variant="outline"
@@ -946,10 +956,9 @@ const AdminDashboard = () => {
                           name: student.full_name,
                         })}
                         disabled={actionLoading === student.id}
-                        className={student.is_banned ? "text-accent" : "text-destructive"}
+                        className={`text-[10px] sm:text-xs h-7 sm:h-8 px-2 sm:px-3 ${student.is_banned ? "text-accent" : "text-destructive"}`}
                       >
-                        {student.is_banned ? <CheckCircle className="w-4 h-4 mr-1" /> : <Ban className="w-4 h-4 mr-1" />}
-                        {student.is_banned ? "Unban" : "Ban"}
+                        {student.is_banned ? <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" /> : <Ban className="w-3 h-3 sm:w-4 sm:h-4" />}
                       </Button>
                       
                       {/* Delete */}
@@ -964,9 +973,9 @@ const AdminDashboard = () => {
                           name: student.full_name,
                         })}
                         disabled={actionLoading === student.id}
-                        className="text-destructive hover:bg-destructive/10"
+                        className="text-destructive hover:bg-destructive/10 h-7 sm:h-8 px-2 sm:px-3"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
                       </Button>
                     </div>
                   </div>

@@ -6,7 +6,6 @@ import {
   BookOpen,
   Clock,
   TrendingUp,
-  Calendar,
   LogOut,
   Play,
   CheckCircle,
@@ -499,68 +498,69 @@ const StudentDashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 py-4">
+      <header className="border-b border-border bg-card sticky top-0 z-10">
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-                <BookOpen className="w-6 h-6 text-primary-foreground" />
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-primary flex items-center justify-center flex-shrink-0">
+                <BookOpen className="w-4 h-4 sm:w-6 sm:h-6 text-primary-foreground" />
               </div>
-              <div>
-                <span className="font-bold text-lg">{t('app.name')}</span>
-                <p className="text-xs text-muted-foreground">{t('nav.dashboard')}</p>
+              <div className="min-w-0">
+                <span className="font-bold text-sm sm:text-lg truncate block">{t('app.name')}</span>
+                <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">{t('nav.dashboard')}</p>
               </div>
             </div>
-              <div className="flex items-center gap-3">
-                <LanguageToggle />
-                <ThemeToggle />
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
-                    <User className="w-4 h-4" />
-                  </div>
-                  <span className="font-medium hidden sm:block">{userName}</span>
+            <div className="flex items-center gap-1 sm:gap-3">
+              <LanguageToggle />
+              <ThemeToggle />
+              <div className="hidden sm:flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
+                  <User className="w-4 h-4" />
                 </div>
-                <Button variant="ghost" size="icon" onClick={handleLogout}>
-                  <LogOut className="w-5 h-5" />
-                </Button>
+                <span className="font-medium">{userName}</span>
               </div>
+              <Button variant="ghost" size="icon" onClick={handleLogout}>
+                <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
+              </Button>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
         {/* Welcome & Start Study */}
-        <div className="mb-8">
-          <div className="edu-card p-6 md:p-8 text-center bg-gradient-to-br from-primary/10 to-accent/10">
-            <h1 className="text-2xl md:text-3xl font-bold mb-2">
+        <div className="mb-6 sm:mb-8">
+          <div className="edu-card p-4 sm:p-6 md:p-8 text-center bg-gradient-to-br from-primary/10 to-accent/10">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2">
               {language === 'en' ? `Hello, ${userName}!` : `Namaste, ${userName}!`} 👋
             </h1>
-            <p className="text-muted-foreground mb-6">
+            <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6">
               {todayStats.studied
                 ? (language === 'en' ? "Great job studying today! Ready for more?" : "Aaj padhai achi ki! Aur karna hai?")
                 : (language === 'en' ? "What do you want to study today? Let's start!" : "Aaj kya padhna hai? Chal start karte hain!")}
             </p>
-            <div className="flex flex-wrap justify-center gap-3">
-              <Button variant="hero" size="xl" onClick={handleStartStudy}>
-                <Play className="w-5 h-5" />
+            <div className="flex flex-wrap justify-center gap-2 sm:gap-3">
+              <Button variant="hero" size="lg" className="text-sm sm:text-base" onClick={handleStartStudy}>
+                <Play className="w-4 h-4 sm:w-5 sm:h-5" />
                 {language === 'en' ? 'Start Studying' : 'Padhai Shuru Karo'}
               </Button>
-              <Button variant="outline" size="lg" onClick={() => setShowChatHistory(true)}>
-                <History className="w-4 h-4 mr-2" />
-                {language === 'en' ? 'Chat History' : 'Chat History'}
+              <Button variant="outline" size="default" className="text-xs sm:text-sm" onClick={() => setShowChatHistory(true)}>
+                <History className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                Chat History
               </Button>
-              <Button variant="outline" size="lg" onClick={() => navigate("/progress")}>
-                <BarChart3 className="w-4 h-4 mr-2" />
+              <Button variant="outline" size="default" className="text-xs sm:text-sm" onClick={() => navigate("/progress")}>
+                <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                 {t('nav.progress')}
               </Button>
               <Button 
                 variant="secondary" 
-                size="lg" 
+                size="default"
+                className="text-xs sm:text-sm"
                 onClick={handleSendReport} 
                 disabled={sendingReport}
               >
-                {sendingReport ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <MessageCircle className="w-4 h-4 mr-2" />}
+                {sendingReport ? <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 animate-spin" /> : <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />}
                 {t('action.sendReport')}
               </Button>
             </div>
