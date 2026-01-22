@@ -142,8 +142,8 @@ OUTPUT FORMAT (strictly JSON):
 STUDY SESSION CONTEXT (use this to create RELEVANT questions based on what was actually studied):
 ${chatContext || `General study session about ${topic || "various topics"}`}`;
 
-    // Use fastest model
-    const MODEL = "google/gemini-2.5-flash";
+    // Use Gemini 3.0 Flash as primary model
+    const MODEL = "google/gemini-3-flash-preview";
 
     console.log(`Calling Lovable AI for adaptive quiz with model: ${MODEL}, questions: ${questionCount}`);
 
