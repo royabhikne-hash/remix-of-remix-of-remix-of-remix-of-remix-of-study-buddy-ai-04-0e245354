@@ -231,9 +231,9 @@ Keep topics short (2-3 words max).` : "";
       }
     }
 
-    // Use faster model as primary
-    const PRIMARY_MODEL = "google/gemini-2.5-flash";
-    const FALLBACK_MODEL = "google/gemini-2.5-flash-lite";
+    // Use Gemini 3.0 Flash as primary model
+    const PRIMARY_MODEL = "google/gemini-3-flash-preview";
+    const FALLBACK_MODEL = "google/gemini-2.5-flash";
 
     const callLovableAI = async (model: string) => {
       console.log(`Calling Lovable AI with model: ${model}`);
