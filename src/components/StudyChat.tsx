@@ -123,9 +123,10 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
   const [voiceSpeed, setVoiceSpeed] = useState(0.9);
   const [autoSpeak, setAutoSpeak] = useState(true); // Auto-speak enabled by default
 
-  // Native TTS hook - works in Capacitor apps and falls back to Web Speech API
-  const { speak: nativeSpeak, stop: stopNativeTTS, isSupported: ttsSupported, isSpeaking, isNative: isNativeTTS } = useNativeTTS();
+  // WebView-optimized TTS hook - works in web-to-app converters
+  const { speak: nativeSpeak, stop: stopNativeTTS, isSupported: ttsSupported, isSpeaking, isNative: isNativeTTS, testTTS } = useNativeTTS();
   const ttsWarnedRef = useRef(false);
+  const [ttsWorking, setTtsWorking] = useState<boolean | null>(null); // null = not tested yet
   
   // Quiz mode state
   const [isQuizMode, setIsQuizMode] = useState(false);
@@ -162,22 +163,38 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Test TTS on mount to check if it actually works in this environment
+  useEffect(() => {
+    const checkTTS = async () => {
+      if (ttsSupported && testTTS) {
+        const works = await testTTS();
+        setTtsWorking(works);
+        console.log(`TTS Test: ${works ? 'Working' : 'Not working'} (Native: ${isNativeTTS})`);
+        
+        if (!works && !ttsWarnedRef.current) {
+          ttsWarnedRef.current = true;
+          // Don't show toast on mount, just disable auto-speak
+          setAutoSpeak(false);
+        }
+      }
+    };
+    
+    // Delay test to let voices load
+    const timer = setTimeout(checkTTS, 1500);
+    return () => clearTimeout(timer);
+  }, [ttsSupported, testTTS, isNativeTTS]);
+
   // Auto-speak welcome greeting when chatbot first opens
   useEffect(() => {
-    if (!ttsSupported) return;
+    if (!ttsSupported || ttsWorking === false) return;
     if (!hasPlayedWelcome && autoSpeak && messages.length === 1) {
       const timer = setTimeout(() => {
         speakText(messages[0].content, messages[0].id);
         setHasPlayedWelcome(true);
-      }, 800);
+      }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [hasPlayedWelcome, autoSpeak, messages, ttsSupported]);
-
-  // Log TTS status
-  useEffect(() => {
-    console.log(`TTS Status: Supported=${ttsSupported}, Native=${isNativeTTS}`);
-  }, [ttsSupported, isNativeTTS]);
+  }, [hasPlayedWelcome, autoSpeak, messages, ttsSupported, ttsWorking]);
 
   // Check for speech recognition support
   useEffect(() => {
@@ -310,14 +327,16 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
     });
   };
 
-  // Unified TTS function using native TTS hook (works in Capacitor and Web)
+  // Unified TTS function - WebView optimized with proper feedback
   const speakText = useCallback(async (text: string, messageId: string, isQuizQuestion: boolean = false) => {
-    if (!ttsSupported) {
+    // Check if TTS is available and working
+    if (!ttsSupported || ttsWorking === false) {
       if (!ttsWarnedRef.current) {
         ttsWarnedRef.current = true;
         toast({
-          title: "Voice support nahi hai",
-          description: "Aapke app/browser me Text-to-Speech available nahi hai.",
+          title: "🔇 Voice available nahi hai",
+          description: "Aapke device/browser me voice support nahi hai. Text padh sakte ho!",
+          duration: 4000,
         });
       }
       return;
@@ -336,7 +355,7 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
     setSpeakingMessageId(messageId);
     
     try {
-      // Use native TTS hook which handles both Capacitor and Web Speech API
+      // Use WebView-optimized TTS hook
       await nativeSpeak({
         text,
         lang: 'hi-IN',
@@ -345,13 +364,23 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
         volume: 1.0,
       });
       
-      console.log(`TTS: Spoke message ${messageId} (Native: ${isNativeTTS})`);
+      console.log(`TTS: Spoke message ${messageId}`);
     } catch (error) {
       console.error("TTS error:", error);
+      // If TTS fails, mark as not working for future attempts
+      if (!ttsWarnedRef.current) {
+        ttsWarnedRef.current = true;
+        setTtsWorking(false);
+        toast({
+          title: "Voice nahi chal raha",
+          description: "Is device pe voice support limited hai.",
+          duration: 3000,
+        });
+      }
     } finally {
       setSpeakingMessageId(null);
     }
-  }, [ttsSupported, speakingMessageId, voiceSpeed, toast, nativeSpeak, stopNativeTTS, isNativeTTS]);
+  }, [ttsSupported, ttsWorking, speakingMessageId, voiceSpeed, toast, nativeSpeak, stopNativeTTS]);
 
   // Function to speak quiz question with correct numbering
   const speakQuizQuestion = useCallback((question: QuizQuestion, questionNumber?: number) => {

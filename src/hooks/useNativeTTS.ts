@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { TextToSpeech } from '@capacitor-community/text-to-speech';
 
 interface TTSOptions {
   text: string;
@@ -11,196 +10,296 @@ interface TTSOptions {
 }
 
 /**
- * Native TTS hook that works in Capacitor apps with Web Speech API fallback
- * Provides reliable voice output across all platforms
+ * WebView-optimized TTS hook
+ * Maximum compatibility with web-to-app converters and WebView wrappers
  */
 export const useNativeTTS = () => {
   const [isNative, setIsNative] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
-  const [availableVoices, setAvailableVoices] = useState<string[]>([]);
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const keepAliveRef = useRef<NodeJS.Timeout | null>(null);
+  const retryCountRef = useRef(0);
 
   useEffect(() => {
     const checkPlatform = async () => {
-      const native = Capacitor.isNativePlatform();
+      // Check if running in Capacitor native app
+      let native = false;
+      try {
+        native = Capacitor.isNativePlatform();
+      } catch {
+        native = false;
+      }
       setIsNative(native);
 
-      if (native) {
-        try {
-          // Check if native TTS is available
-          const languages = await TextToSpeech.getSupportedLanguages();
-          setAvailableVoices(languages.languages || []);
-          setIsSupported(true);
-        } catch (error) {
-          console.error('Native TTS not available:', error);
-          setIsSupported(false);
-        }
+      // For WebView/Web-to-App: Use Web Speech API with optimizations
+      if ('speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined') {
+        setIsSupported(true);
+        
+        // Load voices with retry
+        const loadVoices = () => {
+          const voices = window.speechSynthesis.getVoices();
+          if (voices.length > 0) {
+            setAvailableVoices(voices);
+            console.log('TTS: Loaded', voices.length, 'voices');
+          }
+        };
+        
+        loadVoices();
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+        
+        // Some WebViews need a delay
+        setTimeout(loadVoices, 500);
+        setTimeout(loadVoices, 1500);
       } else {
-        // Web fallback - check Web Speech API
-        setIsSupported('speechSynthesis' in window);
-        if ('speechSynthesis' in window) {
-          const loadVoices = () => {
-            const voices = window.speechSynthesis.getVoices();
-            setAvailableVoices(voices.map(v => v.lang));
-          };
-          loadVoices();
-          window.speechSynthesis.onvoiceschanged = loadVoices;
-        }
+        console.log('TTS: Web Speech API not available');
+        setIsSupported(false);
       }
     };
 
     checkPlatform();
+    
+    return () => {
+      if (keepAliveRef.current) {
+        clearInterval(keepAliveRef.current);
+      }
+    };
   }, []);
 
   /**
    * Sanitize text for TTS - remove markdown, emojis, special chars
+   * Optimized for Hinglish content
    */
   const sanitizeText = useCallback((text: string): string => {
     return text
-      // Remove markdown formatting
-      .replace(/\*\*(.*?)\*\*/g, '$1')
-      .replace(/\*(.*?)\*/g, '$1')
-      .replace(/`(.*?)`/g, '$1')
-      .replace(/#{1,6}\s/g, '')
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-      // Remove emojis
+      // Remove emojis first (comprehensive)
       .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
       .replace(/[\u{1F300}-\u{1F5FF}]/gu, '')
       .replace(/[\u{1F680}-\u{1F6FF}]/gu, '')
       .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '')
       .replace(/[\u{2600}-\u{26FF}]/gu, '')
       .replace(/[\u{2700}-\u{27BF}]/gu, '')
+      .replace(/[\u{1F900}-\u{1F9FF}]/gu, '')
+      .replace(/[\u{1FA00}-\u{1FA6F}]/gu, '')
+      .replace(/[\u{1FA70}-\u{1FAFF}]/gu, '')
+      // Remove markdown formatting
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/\*(.*?)\*/g, '$1')
+      .replace(/`(.*?)`/g, '$1')
+      .replace(/```[\s\S]*?```/g, '')
+      .replace(/#{1,6}\s/g, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
       // Clean up special chars
-      .replace(/[•●○◦▪▫]/g, '')
+      .replace(/[•●○◦▪▫→←↑↓✓✔✗✘]/g, '')
+      // Normalize whitespace
+      .replace(/\n+/g, '. ')
       .replace(/\s+/g, ' ')
       .trim();
   }, []);
 
   /**
-   * Speak text using native TTS or Web Speech API fallback
+   * Get best voice for Hindi/Hinglish content
+   * Prioritizes male voices, then Hindi, then Indian English
    */
-  const speak = useCallback(async (options: TTSOptions): Promise<void> => {
-    const { text, lang = 'hi-IN', rate = 0.9, pitch = 1.0, volume = 1.0 } = options;
-    
-    const cleanText = sanitizeText(text);
-    if (!cleanText) return;
-
-    setIsSpeaking(true);
-
-    try {
-      if (isNative) {
-        // Use native TTS (Capacitor)
-        await TextToSpeech.speak({
-          text: cleanText,
-          lang,
-          rate,
-          pitch,
-          volume,
-        });
-      } else {
-        // Web Speech API fallback
-        await speakWithWebAPI(cleanText, lang, rate, pitch, volume);
-      }
-    } catch (error) {
-      console.error('TTS Error:', error);
-      // Try English fallback
+  const getBestVoice = useCallback((): SpeechSynthesisVoice | null => {
+    if (availableVoices.length === 0) {
       try {
-        if (isNative) {
-          await TextToSpeech.speak({
-            text: cleanText,
-            lang: 'en-IN',
-            rate,
-            pitch,
-            volume,
-          });
-        } else {
-          await speakWithWebAPI(cleanText, 'en-IN', rate, pitch, volume);
+        const voices = window.speechSynthesis.getVoices();
+        if (voices.length > 0) {
+          setAvailableVoices(voices);
         }
-      } catch (fallbackError) {
-        console.error('TTS Fallback Error:', fallbackError);
+      } catch {
+        return null;
       }
-    } finally {
-      setIsSpeaking(false);
     }
-  }, [isNative, sanitizeText]);
+
+    const voices = availableVoices.length > 0 ? availableVoices : window.speechSynthesis.getVoices();
+    
+    // Priority order for voice selection
+    const voicePreferences = [
+      // Hindi male voices
+      (v: SpeechSynthesisVoice) => v.lang === 'hi-IN' && v.name.toLowerCase().includes('male'),
+      (v: SpeechSynthesisVoice) => v.lang === 'hi-IN' && /madhur|hemant|prabhat|ravi/i.test(v.name),
+      (v: SpeechSynthesisVoice) => v.lang === 'hi-IN' && v.name.includes('Google') && !v.name.toLowerCase().includes('female'),
+      (v: SpeechSynthesisVoice) => v.lang === 'hi-IN' && !v.name.toLowerCase().includes('female'),
+      // Any Hindi voice
+      (v: SpeechSynthesisVoice) => v.lang === 'hi-IN',
+      (v: SpeechSynthesisVoice) => v.lang.startsWith('hi'),
+      // Indian English
+      (v: SpeechSynthesisVoice) => v.lang === 'en-IN' && !v.name.toLowerCase().includes('female'),
+      (v: SpeechSynthesisVoice) => v.lang === 'en-IN',
+      // Generic English (most compatible)
+      (v: SpeechSynthesisVoice) => v.lang.startsWith('en') && v.name.includes('Google'),
+      (v: SpeechSynthesisVoice) => v.lang.startsWith('en'),
+    ];
+
+    for (const preference of voicePreferences) {
+      const voice = voices.find(preference);
+      if (voice) return voice;
+    }
+
+    return voices[0] || null;
+  }, [availableVoices]);
 
   /**
-   * Web Speech API implementation with optimizations
+   * Split long text into chunks for better WebView compatibility
+   * WebViews often fail on long text
    */
-  const speakWithWebAPI = useCallback((
+  const splitTextIntoChunks = useCallback((text: string, maxLength: number = 150): string[] => {
+    if (text.length <= maxLength) return [text];
+
+    const chunks: string[] = [];
+    const sentences = text.split(/(?<=[.!?।])\s+/);
+    let currentChunk = '';
+
+    for (const sentence of sentences) {
+      if ((currentChunk + ' ' + sentence).trim().length <= maxLength) {
+        currentChunk = (currentChunk + ' ' + sentence).trim();
+      } else {
+        if (currentChunk) chunks.push(currentChunk);
+        currentChunk = sentence;
+      }
+    }
+    if (currentChunk) chunks.push(currentChunk);
+
+    return chunks;
+  }, []);
+
+  /**
+   * Speak a single chunk with WebView optimizations
+   */
+  const speakChunk = useCallback((
     text: string,
-    lang: string,
+    voice: SpeechSynthesisVoice | null,
     rate: number,
     pitch: number,
     volume: number
   ): Promise<void> => {
     return new Promise((resolve, reject) => {
-      if (!('speechSynthesis' in window)) {
-        reject(new Error('Web Speech API not supported'));
-        return;
-      }
+      try {
+        // Cancel any existing speech
+        window.speechSynthesis.cancel();
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utteranceRef.current = utterance;
+        
+        if (voice) {
+          utterance.voice = voice;
+          utterance.lang = voice.lang;
+        } else {
+          utterance.lang = 'hi-IN';
+        }
+        
+        utterance.rate = Math.max(0.5, Math.min(2, rate));
+        utterance.pitch = Math.max(0, Math.min(2, pitch));
+        utterance.volume = Math.max(0, Math.min(1, volume));
 
-      // Cancel any ongoing speech
-      window.speechSynthesis.cancel();
+        // WebView compatibility: Force resume if paused
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        }
 
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = lang;
-      utterance.rate = rate;
-      utterance.pitch = pitch;
-      utterance.volume = volume;
+        utterance.onend = () => {
+          resolve();
+        };
 
-      // Find best voice for Hindi
-      const voices = window.speechSynthesis.getVoices();
-      const hindiVoices = voices.filter(v => 
-        v.lang.includes('hi') || v.lang.includes('IN')
-      );
-      
-      // Prefer male Hindi voices
-      const preferredVoice = hindiVoices.find(v => 
-        v.name.toLowerCase().includes('male') ||
-        v.name.includes('Madhur') ||
-        v.name.includes('Hemant') ||
-        v.name.includes('Prabhat')
-      ) || hindiVoices[0] || voices.find(v => v.lang.includes('en-IN'));
+        utterance.onerror = (event) => {
+          console.warn('TTS chunk error:', event.error);
+          // Don't reject on 'interrupted' or 'canceled' - these are normal
+          if (event.error === 'interrupted' || event.error === 'canceled') {
+            resolve();
+          } else {
+            reject(new Error(event.error));
+          }
+        };
 
-      if (preferredVoice) {
-        utterance.voice = preferredVoice;
-      }
+        window.speechSynthesis.speak(utterance);
 
-      // Keep-alive interval for WebView (prevents 15-sec cutoff)
-      let keepAliveInterval: NodeJS.Timeout | null = null;
-      
-      utterance.onstart = () => {
-        keepAliveInterval = setInterval(() => {
-          if (window.speechSynthesis.speaking) {
+        // Chrome/WebView 15-second timeout fix
+        if (keepAliveRef.current) {
+          clearInterval(keepAliveRef.current);
+        }
+        keepAliveRef.current = setInterval(() => {
+          if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
             window.speechSynthesis.pause();
             window.speechSynthesis.resume();
           }
         }, 10000);
-      };
 
-      utterance.onend = () => {
-        if (keepAliveInterval) clearInterval(keepAliveInterval);
-        resolve();
-      };
-
-      utterance.onerror = (event) => {
-        if (keepAliveInterval) clearInterval(keepAliveInterval);
-        reject(event.error);
-      };
-
-      window.speechSynthesis.speak(utterance);
+      } catch (error) {
+        reject(error);
+      }
     });
   }, []);
+
+  /**
+   * Main speak function - WebView optimized
+   */
+  const speak = useCallback(async (options: TTSOptions): Promise<void> => {
+    const { text, lang = 'hi-IN', rate = 0.9, pitch = 1.0, volume = 1.0 } = options;
+    
+    if (!isSupported) {
+      console.log('TTS: Not supported on this device');
+      return;
+    }
+
+    const cleanText = sanitizeText(text);
+    if (!cleanText) return;
+
+    setIsSpeaking(true);
+    retryCountRef.current = 0;
+
+    try {
+      const voice = getBestVoice();
+      const chunks = splitTextIntoChunks(cleanText);
+      
+      console.log(`TTS: Speaking ${chunks.length} chunks with voice: ${voice?.name || 'default'}`);
+
+      for (let i = 0; i < chunks.length; i++) {
+        await speakChunk(chunks[i], voice, rate, pitch, volume);
+        
+        // Small delay between chunks for stability
+        if (i < chunks.length - 1) {
+          await new Promise(r => setTimeout(r, 100));
+        }
+      }
+    } catch (error) {
+      console.error('TTS Error:', error);
+      
+      // Retry with English voice if Hindi fails
+      if (retryCountRef.current < 1) {
+        retryCountRef.current++;
+        console.log('TTS: Retrying with English fallback...');
+        
+        try {
+          const englishVoice = availableVoices.find(v => v.lang.startsWith('en')) || null;
+          const shortText = cleanText.substring(0, 100);
+          await speakChunk(shortText, englishVoice, rate, pitch, volume);
+        } catch (retryError) {
+          console.error('TTS Retry failed:', retryError);
+        }
+      }
+    } finally {
+      if (keepAliveRef.current) {
+        clearInterval(keepAliveRef.current);
+        keepAliveRef.current = null;
+      }
+      setIsSpeaking(false);
+    }
+  }, [isSupported, sanitizeText, getBestVoice, splitTextIntoChunks, speakChunk, availableVoices]);
 
   /**
    * Stop any ongoing speech
    */
   const stop = useCallback(async () => {
     try {
-      if (isNative) {
-        await TextToSpeech.stop();
-      } else if ('speechSynthesis' in window) {
+      if (keepAliveRef.current) {
+        clearInterval(keepAliveRef.current);
+        keepAliveRef.current = null;
+      }
+      
+      if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
     } catch (error) {
@@ -208,18 +307,45 @@ export const useNativeTTS = () => {
     } finally {
       setIsSpeaking(false);
     }
-  }, [isNative]);
+  }, []);
 
   /**
    * Check if currently speaking
    */
-  const checkSpeaking = useCallback(async (): Promise<boolean> => {
-    if (isNative) {
-      // Native doesn't have a direct check, use state
-      return isSpeaking;
+  const checkSpeaking = useCallback((): boolean => {
+    if ('speechSynthesis' in window) {
+      return window.speechSynthesis.speaking;
     }
-    return 'speechSynthesis' in window && window.speechSynthesis.speaking;
-  }, [isNative, isSpeaking]);
+    return isSpeaking;
+  }, [isSpeaking]);
+
+  /**
+   * Test if TTS actually works on this device
+   */
+  const testTTS = useCallback(async (): Promise<boolean> => {
+    if (!isSupported) return false;
+    
+    try {
+      const testUtterance = new SpeechSynthesisUtterance('test');
+      testUtterance.volume = 0.01; // Nearly silent
+      testUtterance.rate = 2; // Fast
+      
+      return new Promise((resolve) => {
+        testUtterance.onend = () => resolve(true);
+        testUtterance.onerror = () => resolve(false);
+        
+        window.speechSynthesis.speak(testUtterance);
+        
+        // Timeout fallback
+        setTimeout(() => {
+          window.speechSynthesis.cancel();
+          resolve(false);
+        }, 3000);
+      });
+    } catch {
+      return false;
+    }
+  }, [isSupported]);
 
   return {
     speak,
@@ -230,6 +356,7 @@ export const useNativeTTS = () => {
     availableVoices,
     checkSpeaking,
     sanitizeText,
+    testTTS,
   };
 };
 
